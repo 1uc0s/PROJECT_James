@@ -6,6 +6,10 @@ from pyannote.audio import Pipeline
 import torch
 from datetime import datetime
 import time
+import warnings
+
+# Suppress deprecation warnings
+warnings.filterwarnings("ignore")
 
 from config import TRANSCRIPT_DIR
 
@@ -16,17 +20,36 @@ class SpeechProcessor:
         
         # Initialize Whisper for speech recognition
         print("Loading Whisper model...")
-        self.whisper_model = whisper.load_model(whisper_model)
+        try:
+            self.whisper_model = whisper.load_model(whisper_model)
+            print(f"Whisper {whisper_model} model loaded successfully")
+        except Exception as e:
+            print(f"Error loading Whisper model: {e}")
+            print("Please make sure Whisper is properly installed")
+            raise
         
         # Initialize speaker diarization if GPU is available
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # For M1 Macs, try to use MPS (Metal Performance Shaders)
+        if torch.backends.mps.is_available():
+            self.device = "mps"
+            print("Using Apple Metal (MPS) for acceleration")
+            
         try:
             print(f"Loading diarization model on {self.device}...")
             # Note: This requires a HuggingFace token in practice
             self.diarization = Pipeline.from_pretrained(
                 diarization_model, 
                 use_auth_token=os.environ.get("HF_TOKEN")
-            ).to(self.device)
+            )
+            
+            # Move to appropriate device
+            if self.device == "mps":
+                # PyAnnote might not support MPS directly
+                self.diarization = self.diarization.to("cpu")
+            else:
+                self.diarization = self.diarization.to(self.device)
+                
             print("Diarization model loaded successfully")
         except Exception as e:
             print(f"Warning: Could not load diarization model: {e}")

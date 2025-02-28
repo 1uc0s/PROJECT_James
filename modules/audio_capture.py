@@ -1,6 +1,6 @@
 # modules/audio_capture.py
 import os
-import wave
+import wave  # Built-in wave module, not an external package
 import pyaudio
 import time
 from datetime import datetime
