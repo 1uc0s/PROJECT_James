@@ -1,0 +1,28 @@
+# Audio processing
+pyaudio
+sounddevice
+pydub
+# wave is part of the Python standard library, no need to install
+
+# Speech recognition and diarization
+whisper  # Using official OpenAI whisper package
+pyannote.audio
+torch
+torchaudio
+
+# LLM integration
+llama-cpp-python
+transformers
+
+# Image processing
+Pillow
+opencv-python
+
+# Document generation
+python-docx
+markdown
+fpdf
+
+# Utilities
+numpy
+tqdm
