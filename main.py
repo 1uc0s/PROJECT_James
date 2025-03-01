@@ -301,14 +301,19 @@ def main():
     """Main application entry point"""
     parser = argparse.ArgumentParser(description='Lab Book Generator (Terminal Controls)')
     
-    # Main operation modes
+ # Main operation modes
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument('--record', action='store_true', help='Start audio recording')
     mode_group.add_argument('--process', type=str, help='Process an existing audio file')
     mode_group.add_argument('--list', action='store_true', help='List available recordings and lab books')
     mode_group.add_argument('--sessions', action='store_true', help='List all recorded sessions')
     mode_group.add_argument('--process-session', type=str, help='Process an existing session')
+    mode_group.add_argument('--add-image', type=str, help='Add an image to the latest lab book')
     
+    # Optional arguments
+    parser.add_argument('--output-format', type=str, choices=['markdown', 'docx', 'both'], 
+                        default='markdown', help='Output format for the lab book (default: markdown)')
+
     # Optional arguments
     parser.add_argument('--output-format', type=str, choices=['markdown', 'docx', 'both'], 
                         default='both', help='Output format for the lab book')
