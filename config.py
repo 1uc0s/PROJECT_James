@@ -21,7 +21,7 @@ OUTPUT_DIR = os.path.join(DATA_DIR, "output")
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 
 # LLM settings
-LLM_MODEL_PATH = None  # Set to your local model path
+LLM_MODEL_PATH = "ollama:llama3.2"  # Using Ollama with llama3.2
 LLM_CONTEXT_SIZE = 4096
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 2048

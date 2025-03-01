@@ -1,22 +1,55 @@
 # modules/llm_interface.py
 import os
+import json
+import requests
 from datetime import datetime
-from llama_cpp import Llama
+import re
 
 from config import LLM_MODEL_PATH, LLM_CONTEXT_SIZE, LLM_TEMPERATURE, LLM_MAX_TOKENS, LAB_BOOK_PROMPT, IMAGE_ANALYSIS_PROMPT
 
 class LLMInterface:
     def __init__(self, model_path=None):
-        """Initialize the LLM interface using llama-cpp-python"""
+        """Initialize the LLM interface with support for Ollama"""
         self.model_path = model_path or LLM_MODEL_PATH
+        self.use_ollama = False
+        self.ollama_model = None
         
+        # Check if we're using Ollama
+        if self.model_path and "ollama:" in self.model_path:
+            self.ollama_model = self.model_path.split("ollama:")[1]
+            self.use_ollama = True
+            print(f"Using Ollama with model: {self.ollama_model}")
+            
+            # Test Ollama availability
+            try:
+                response = requests.get("http://localhost:11434/api/tags")
+                if response.status_code == 200:
+                    models = response.json().get("models", [])
+                    available_models = [model["name"] for model in models]
+                    
+                    if self.ollama_model in available_models:
+                        print(f"Ollama model '{self.ollama_model}' is available")
+                    else:
+                        print(f"Warning: Model '{self.ollama_model}' not found in Ollama")
+                        print(f"Available models: {', '.join(available_models)}")
+                        print("Continuing in demo mode")
+                        self.use_ollama = False
+            except Exception as e:
+                print(f"Error connecting to Ollama: {e}")
+                print("Make sure Ollama is running (run 'ollama serve' in another terminal)")
+                print("Continuing in demo mode")
+                self.use_ollama = False
+            
+            return
+            
+        # Traditional llama-cpp-python approach as fallback
         if not self.model_path:
             print("Warning: No LLM model path specified. Please set LLM_MODEL_PATH in config.py")
             print("Running in demo mode - responses will be placeholders")
             self.llm = None
             return
             
-        # Check if model file exists
+        # Check if model file exists for local GGUF models
         if not os.path.exists(self.model_path):
             print(f"Warning: LLM model not found at {self.model_path}")
             print("Running in demo mode - responses will be placeholders")
@@ -25,6 +58,7 @@ class LLMInterface:
         
         print(f"Loading LLM model from {self.model_path}...")
         try:
+            from llama_cpp import Llama
             self.llm = Llama(
                 model_path=self.model_path,
                 n_ctx=LLM_CONTEXT_SIZE,
@@ -46,11 +80,42 @@ class LLMInterface:
             transcript=transcript
         )
         
+        # Use Ollama if configured
+        if self.use_ollama and self.ollama_model:
+            try:
+                print(f"Generating lab book content with Ollama ({self.ollama_model})...")
+                response = requests.post(
+                    "http://localhost:11434/api/generate",
+                    json={
+                        "model": self.ollama_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {
+                            "temperature": LLM_TEMPERATURE,
+                            "num_predict": LLM_MAX_TOKENS
+                        }
+                    }
+                )
+                
+                if response.status_code == 200:
+                    generated_text = response.json().get("response", "")
+                    return generated_text.strip()
+                else:
+                    print(f"Error from Ollama API: {response.text}")
+                    print("Falling back to demo mode")
+                    return self._generate_demo_lab_book(transcript)
+                    
+            except Exception as e:
+                print(f"Error generating with Ollama: {e}")
+                print("Falling back to demo mode")
+                return self._generate_demo_lab_book(transcript)
+        
+        # Use llama-cpp-python if available
         if not self.llm:
             print("Using demo mode for lab book generation")
             return self._generate_demo_lab_book(transcript)
         
-        # Generate response from LLM
+        # Generate response from llama-cpp-python LLM
         try:
             print("Generating lab book content...")
             response = self.llm(
@@ -77,17 +142,19 @@ class LLMInterface:
             
         # This would normally use a multimodal LLM
         # For now, we'll just return a placeholder response
+        if self.use_ollama:
+            # Ollama doesn't support multimodal yet in this interface
+            return f"[Analysis of {os.path.basename(image_path)} - multimodal analysis would be generated here]"
+            
         if not self.llm:
             return f"[Placeholder image analysis for {os.path.basename(image_path)}]"
             
         # In a real implementation, this would use a multimodal model
-        # or integrate with a vision API
         return f"[Analysis of {os.path.basename(image_path)} would be generated here using a multimodal model]"
     
     def _generate_demo_lab_book(self, transcript):
         """Generate a simple demo lab book when no LLM is available"""
         # Extract potential participants (look for names in the transcript)
-        import re
         participants = set()
         name_pattern = r'\b[A-Z][a-z]+ [A-Z][a-z]+\b'
         for match in re.finditer(name_pattern, transcript):
@@ -127,7 +194,7 @@ class LLMInterface:
 [This section would be extracted from the transcript by the LLM]
 
 ---
-Note: This is a demo lab book. For full functionality, please configure a local LLM model.
+Note: This is a demo lab book. For full functionality, please ensure Ollama is running with your preferred model.
 """
 
 
@@ -137,7 +204,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Test LLM interface")
-    parser.add_argument("--model", help="Path to the LLM model")
+    parser.add_argument("--model", help="Path to the LLM model or 'ollama:model_name'")
     parser.add_argument("--transcript", help="Path to transcript file")
     args = parser.parse_args()
     
