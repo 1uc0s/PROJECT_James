@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# terminal_main.py - Version without keyboard module
+# main.py - Updated version with lab cycle support, enhanced diarization and post-processing
 import os
 import sys
 import time
@@ -9,17 +9,22 @@ from datetime import datetime
 
 # Import project modules
 from modules.robust_audio import RobustAudioRecorder
-from modules.speech_processing import SpeechProcessor
-from modules.llm_interface import LLMInterface
+from modules.enhanced_speech_processing import EnhancedSpeechProcessor
+from modules.llm_interface_updated import LLMInterface
 from modules.document_generator import DocumentGenerator
-from modules.session_manager import SessionManager
+from modules.session_manager_updated import SessionManager
+from modules.lab_cycle_manager import LabCycleManager
 
 # Import configuration
-from config import OUTPUT_DIR, AUDIO_DIR
+from config import (
+    OUTPUT_DIR, AUDIO_DIR, DEFAULT_LAB_CYCLE, 
+    DEFAULT_API_PROVIDER, DEFAULT_POST_PROCESS
+)
 
 class RecordingController:
     """Terminal-based recording controller using keyboard input in the main thread"""
     def __init__(self, recorder, session_manager):
+        """Initialize the recording controller with recorder and session manager"""
         self.recorder = recorder
         self.session_manager = session_manager
         self.running = True
@@ -142,9 +147,10 @@ def record_with_terminal_controls(args):
     # Initialize recorder without noise filtering for stability
     recorder = RobustAudioRecorder()
     
-    # Initialize session manager
+    # Initialize session manager with cycle_id if provided
     session_manager = SessionManager(
         session_id=args.session_id,
+        cycle_id=args.cycle_id or DEFAULT_LAB_CYCLE,
         whisper_model=args.whisper_model,
         llm_model=args.model
     )
@@ -158,7 +164,9 @@ def record_with_terminal_controls(args):
     # Start controller
     controller.start()
 
-def process_audio_file(audio_path, model_path=None, whisper_model='base', output_format='both', custom_prompt=None):
+def process_audio_file(audio_path, model_path=None, whisper_model='base', 
+                       output_format='both', custom_prompt=None, cycle_id=None,
+                       post_process=DEFAULT_POST_PROCESS, api_provider=DEFAULT_API_PROVIDER):
     """Process an audio file to generate a lab book"""
     if not os.path.exists(audio_path):
         print(f"Error: Audio file not found at {audio_path}")
@@ -167,27 +175,62 @@ def process_audio_file(audio_path, model_path=None, whisper_model='base', output
     print(f"Processing audio file: {audio_path}")
     
     # Step 1: Speech recognition and diarization
-    speech_processor = SpeechProcessor(whisper_model=whisper_model)
+    speech_processor = EnhancedSpeechProcessor(whisper_model=whisper_model)
     transcript_file, transcript_data = speech_processor.process_audio(audio_path)
+    
+    # Get the main transcript and external comments
     transcript_text = transcript_data["full_text"]
+    external_comments = transcript_data.get("external_text", "")
     
     print("\nTranscript Summary:")
     print(f"Duration: {transcript_data['duration']:.2f} seconds")
     print(f"Language: {transcript_data['language']}")
-    print(f"Speakers identified: {len(set(seg['speaker'] for seg in transcript_data['segments'] if seg['speaker'] != 'unknown'))}")
     
-    # Step 2: Load custom prompt if provided
+    speaker_categories = transcript_data.get("speaker_categories", {})
+    speakers_by_role = {}
+    for speaker_id, data in speaker_categories.items():
+        role = data.get("role", "unknown")
+        if role not in speakers_by_role:
+            speakers_by_role[role] = []
+        speakers_by_role[role].append(data.get("label", speaker_id))
+    
+    print(f"Primary speakers: {', '.join(speakers_by_role.get('primary', ['None detected']))}")
+    print(f"External speakers: {', '.join(speakers_by_role.get('external', ['None detected']))}")
+    
+    # Step 2: Get RAG context if cycle_id is provided
+    rag_context = ""
+    if cycle_id:
+        try:
+            lab_cycle_manager = LabCycleManager()
+            
+            # Use the first 1000 characters of transcript as query
+            query = transcript_text[:1000]
+            rag_context = lab_cycle_manager.get_knowledge_context(
+                cycle_id, query, max_results=3, format_for_prompt=True
+            )
+            
+            if rag_context:
+                print("Retrieved relevant context from previous sessions in this lab cycle")
+        except Exception as e:
+            print(f"Error retrieving RAG context: {e}")
+    
+    # Step 3: Load custom prompt if provided
     if custom_prompt and os.path.exists(custom_prompt):
         with open(custom_prompt, 'r') as f:
             prompt_template = f.read()
     else:
         prompt_template = None
     
-    # Step 3: Generate lab book using LLM
+    # Step 4: Generate lab book using LLM
     llm = LLMInterface(model_path)
-    lab_book_content = llm.generate_lab_book(transcript_text, prompt_template)
+    lab_book_content = llm.generate_lab_book(
+        transcript_text, 
+        prompt_template, 
+        rag_context=rag_context,
+        external_comments=external_comments
+    )
     
-    # Step 4: Create document
+    # Step 5: Create document
     doc_generator = DocumentGenerator()
     
     # Extract a title from the generated content
@@ -210,6 +253,45 @@ def process_audio_file(audio_path, model_path=None, whisper_model='base', output
     
     print("\nLab book generation complete!")
     print(f"Output files: {', '.join(output_files)}")
+    
+    # Step 6: Post-process with advanced LLM if requested
+    if post_process:
+        print("\nPost-processing lab book with advanced LLM...")
+        analysis = llm.post_process_with_external_api(
+            lab_book_content, 
+            api_provider=api_provider
+        )
+        
+        # Save analysis to file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        analysis_file = os.path.join(OUTPUT_DIR, f"analysis_{timestamp}.md")
+        
+        with open(analysis_file, 'w') as f:
+            f.write(f"# Analysis of Lab Book: {title}\n\n")
+            f.write(analysis)
+        
+        print(f"Analysis saved to: {analysis_file}")
+        output_files.append(analysis_file)
+    
+    # Step 7: If part of a lab cycle, add to knowledge base
+    if cycle_id and output_format in ['markdown', 'both']:
+        try:
+            lab_cycle_manager = LabCycleManager()
+            
+            # Add to knowledge base
+            document_id = lab_cycle_manager.add_document_to_knowledge_base(
+                cycle_id,
+                lab_book_content,
+                title=title,
+                document_id=f"labbook_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                metadata={"source_file": audio_path}
+            )
+            
+            # Update the index
+            lab_cycle_manager.build_knowledge_base_index(cycle_id)
+            print(f"Added lab book to knowledge base for cycle '{cycle_id}'")
+        except Exception as e:
+            print(f"Error adding to knowledge base: {e}")
     
     return output_files
 
@@ -258,8 +340,9 @@ def list_sessions():
             if session["end_time"]:
                 end_time = datetime.fromisoformat(session["end_time"]).strftime('%Y-%m-%d %H:%M:%S')
             
+            cycle_info = f" (Cycle: {session['cycle_id']})" if session.get('cycle_id') else ""
             duration = f"{session['total_duration']:.2f}s"
-            print(f"  Session: {session['session_id']}")
+            print(f"  Session: {session['session_id']}{cycle_info}")
             print(f"    Started: {start_time}")
             print(f"    Ended: {end_time}")
             print(f"    Recordings: {session['recordings']}")
@@ -269,12 +352,40 @@ def list_sessions():
     else:
         print("  No sessions found")
 
-def process_session(session_id, model_path=None, whisper_model='base', output_format='both', custom_prompt=None):
+def list_lab_cycles():
+    """List all available lab cycles"""
+    lab_cycle_manager = LabCycleManager()
+    cycles = lab_cycle_manager.list_lab_cycles()
+    
+    print("\nAvailable Lab Cycles:")
+    if cycles:
+        # Sort cycles by creation date (newest first)
+        cycles.sort(key=lambda c: c.get("created_at", ""), reverse=True)
+        
+        for cycle in cycles:
+            created_at = datetime.fromisoformat(cycle["created_at"]).strftime('%Y-%m-%d %H:%M:%S')
+            session_count = len(cycle.get("sessions", []))
+            doc_count = cycle.get("knowledge_base", {}).get("document_count", 0)
+            
+            print(f"  Cycle: {cycle['cycle_id']} - {cycle['title']}")
+            print(f"    Created: {created_at}")
+            print(f"    Sessions: {session_count}")
+            print(f"    Knowledge Base Documents: {doc_count}")
+            if cycle.get("description"):
+                print(f"    Description: {cycle['description']}")
+            print("")
+    else:
+        print("  No lab cycles found")
+
+def process_session(session_id, model_path=None, whisper_model='base', 
+                   output_format='both', custom_prompt=None, cycle_id=None,
+                   post_process=DEFAULT_POST_PROCESS, api_provider=DEFAULT_API_PROVIDER):
     """Process an existing session to generate a lab book"""
     try:
         # Load the session
         session = SessionManager.load_session(
             session_id=session_id,
+            cycle_id=cycle_id,  # Will auto-detect if not provided
             whisper_model=whisper_model,
             llm_model=model_path
         )
@@ -285,11 +396,38 @@ def process_session(session_id, model_path=None, whisper_model='base', output_fo
             custom_prompt=custom_prompt
         )
         
-        if output_files:
-            print("\nLab book generated successfully!")
-            print(f"Output files: {', '.join(output_files)}")
-        else:
+        if not output_files:
             print("\nFailed to generate lab book for this session.")
+            return None
+        
+        print("\nLab book generated successfully!")
+        print(f"Output files: {', '.join(output_files)}")
+        
+        # Post-process with advanced LLM if requested
+        if post_process:
+            # Get the markdown file or first file
+            lab_book_file = next((f for f in output_files if f.endswith('.md')), output_files[0])
+            
+            with open(lab_book_file, 'r') as f:
+                lab_book_content = f.read()
+            
+            print("\nPost-processing lab book with advanced LLM...")
+            llm = LLMInterface(model_path)
+            analysis = llm.post_process_with_external_api(
+                lab_book_content, 
+                api_provider=api_provider
+            )
+            
+            # Save analysis to file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            analysis_file = os.path.join(OUTPUT_DIR, f"analysis_{timestamp}.md")
+            
+            with open(analysis_file, 'w') as f:
+                f.write(f"# Analysis of Lab Book: {session_id}\n\n")
+                f.write(analysis)
+            
+            print(f"Analysis saved to: {analysis_file}")
+            output_files.append(analysis_file)
         
         return output_files
         
@@ -297,23 +435,36 @@ def process_session(session_id, model_path=None, whisper_model='base', output_fo
         print(f"Error processing session: {e}")
         return None
 
+def create_lab_cycle(cycle_id, title, description=None):
+    """Create a new lab cycle"""
+    lab_cycle_manager = LabCycleManager()
+    
+    try:
+        lab_cycle_manager.create_lab_cycle(cycle_id, title, description)
+        print(f"Created lab cycle: {title} (ID: {cycle_id})")
+        
+        if description:
+            print(f"Description: {description}")
+        
+    except ValueError as e:
+        print(f"Error creating lab cycle: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+
 def main():
     """Main application entry point"""
-    parser = argparse.ArgumentParser(description='Lab Book Generator (Terminal Controls)')
+    parser = argparse.ArgumentParser(description='Lab Book Generator (with lab cycles and advanced features)')
     
- # Main operation modes
+    # Main operation modes
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument('--record', action='store_true', help='Start audio recording')
     mode_group.add_argument('--process', type=str, help='Process an existing audio file')
     mode_group.add_argument('--list', action='store_true', help='List available recordings and lab books')
     mode_group.add_argument('--sessions', action='store_true', help='List all recorded sessions')
     mode_group.add_argument('--process-session', type=str, help='Process an existing session')
-    mode_group.add_argument('--add-image', type=str, help='Add an image to the latest lab book')
+    mode_group.add_argument('--create-cycle', type=str, help='Create a new lab cycle with provided ID')
+    mode_group.add_argument('--cycles', action='store_true', help='List all lab cycles')
     
-    # Optional arguments
-    parser.add_argument('--output-format', type=str, choices=['markdown', 'docx', 'both'], 
-                        default='markdown', help='Output format for the lab book (default: markdown)')
-
     # Optional arguments
     parser.add_argument('--output-format', type=str, choices=['markdown', 'docx', 'both'], 
                         default='both', help='Output format for the lab book')
@@ -325,8 +476,17 @@ def main():
                         help='Maximum recording duration in seconds (0 = unlimited)')
     parser.add_argument('--prompt', type=str, help='Custom prompt template file for the LLM')
     parser.add_argument('--session-id', type=str, help='Specify a session ID')
+    parser.add_argument('--cycle-id', type=str, help='Specify a lab cycle ID')
     parser.add_argument('--context-size', type=int, default=8192, 
                         help='Context size for the LLM (for large transcripts)')
+    parser.add_argument('--cycle-title', type=str, help='Title for new lab cycle')
+    parser.add_argument('--cycle-desc', type=str, help='Description for new lab cycle')
+    parser.add_argument('--post-process', action='store_true', default=DEFAULT_POST_PROCESS,
+                        help='Post-process with advanced LLM API')
+    parser.add_argument('--no-post-process', action='store_true',
+                        help='Skip post-processing with advanced LLM API')
+    parser.add_argument('--api', type=str, choices=['openai', 'anthropic'], 
+                        default=DEFAULT_API_PROVIDER, help='API provider for post-processing')
     
     args = parser.parse_args()
     
@@ -334,6 +494,11 @@ def main():
     if args.context_size:
         from config import LLM_CONTEXT_SIZE
         LLM_CONTEXT_SIZE = args.context_size
+    
+    # Determine post-processing flag (--no-post-process overrides --post-process)
+    post_process = args.post_process
+    if args.no_post_process:
+        post_process = False
     
     if args.record:
         # Record with terminal-based controls
@@ -347,7 +512,10 @@ def main():
             model_path=args.model,
             whisper_model=args.whisper_model,
             output_format=args.output_format,
-            custom_prompt=args.prompt
+            custom_prompt=args.prompt,
+            cycle_id=args.cycle_id,
+            post_process=post_process,
+            api_provider=args.api
         )
     
     elif args.process_session:
@@ -358,7 +526,10 @@ def main():
             model_path=args.model,
             whisper_model=args.whisper_model,
             output_format=args.output_format,
-            custom_prompt=args.prompt
+            custom_prompt=args.prompt,
+            cycle_id=args.cycle_id,
+            post_process=post_process,
+            api_provider=args.api
         )
     
     elif args.list:
@@ -370,6 +541,24 @@ def main():
         # List available sessions
         print("\n=== Lab Book Generator: Session Listing ===")
         list_sessions()
+    
+    elif args.create_cycle:
+        # Create a new lab cycle
+        if not args.cycle_title:
+            print("Error: --cycle-title is required when creating a lab cycle")
+            return
+            
+        print("\n=== Lab Book Generator: Create Lab Cycle ===")
+        create_lab_cycle(
+            args.create_cycle,
+            args.cycle_title,
+            args.cycle_desc
+        )
+    
+    elif args.cycles:
+        # List available lab cycles
+        print("\n=== Lab Book Generator: Lab Cycle Listing ===")
+        list_lab_cycles()
 
 if __name__ == "__main__":
     main()

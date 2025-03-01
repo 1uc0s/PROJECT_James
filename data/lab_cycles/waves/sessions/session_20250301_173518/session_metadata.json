@@ -1,0 +1,56 @@
+{
+  "session_id": "session_20250301_173518",
+  "cycle_id": "waves",
+  "start_time": "2025-03-01T17:35:18.933353",
+  "end_time": "2025-03-01T17:36:23.425497",
+  "recordings": [
+    {
+      "filename": "segment_001.wav",
+      "original_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/audio/lab_session_20250301_173518.wav",
+      "path": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/audio/segment_001.wav",
+      "timestamp": "2025-03-01T17:35:43.651579",
+      "duration": 0,
+      "processed": true,
+      "transcript": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/transcripts/segment_001_transcript.json"
+    },
+    {
+      "filename": "segment_002.wav",
+      "original_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/audio/temp_segment_20250301_173558.wav",
+      "path": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/audio/segment_002.wav",
+      "timestamp": "2025-03-01T17:35:58.122842",
+      "duration": 0,
+      "processed": true,
+      "transcript": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/transcripts/segment_002_transcript.json"
+    },
+    {
+      "filename": "segment_003.wav",
+      "original_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/audio/lab_session_20250301_173544.wav",
+      "path": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/audio/segment_003.wav",
+      "timestamp": "2025-03-01T17:36:23.423348",
+      "duration": 0,
+      "processed": true,
+      "transcript": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/transcripts/segment_003_transcript.json"
+    }
+  ],
+  "total_duration": 0,
+  "lab_books": [
+    {
+      "timestamp": "20250301_173616",
+      "title": "Lab Session 2025-03-01",
+      "files": [
+        "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/output/labbook_20250301_173616.md",
+        "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/output/labbook_20250301_173616.docx"
+      ],
+      "duration": 0
+    },
+    {
+      "timestamp": "20250301_173636",
+      "title": "Lab Session 2025-03-01",
+      "files": [
+        "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/output/labbook_20250301_173636.md",
+        "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/output/labbook_20250301_173636.docx"
+      ],
+      "duration": 0
+    }
+  ]
+}

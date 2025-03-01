@@ -1,0 +1,23 @@
+{
+  "audio_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/lab_cycles/waves/sessions/session_20250301_173518/audio/segment_003.wav",
+  "date": "2025-03-01",
+  "language": "en",
+  "duration": 17.64,
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 10.44,
+      "text": "saved a new segment so everyone can hear me all as well and now going to create a",
+      "speaker": "unknown"
+    },
+    {
+      "id": 1,
+      "start": 10.44,
+      "end": 17.64,
+      "text": "lab book now into Media I have and okay and then now let's quit",
+      "speaker": "unknown"
+    }
+  ],
+  "full_text": "saved a new segment so everyone can hear me all as well and now going to create a\nlab book now into Media I have and okay and then now let's quit"
+}
