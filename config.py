@@ -37,7 +37,7 @@ SILENCE_THRESHOLD = 500
 SILENCE_DURATION = 3  # seconds
 
 # LLM settings
-LLM_MODEL_PATH = "deepseek-r1:1.5b"  # Using Ollama with llama3.2
+LLM_MODEL_PATH = "llama3.2:latest"  # Using Ollama with llama3.2
 LLM_CONTEXT_SIZE = 4096
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 2048
