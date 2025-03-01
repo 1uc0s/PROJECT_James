@@ -1,0 +1,23 @@
+{
+  "audio_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/audio/lab_session_20250301_111306.wav",
+  "date": "2025-03-01",
+  "language": "en",
+  "duration": 12.1,
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 2.7,
+      "text": "Hello, hello, hello, we're on",
+      "speaker": "unknown"
+    },
+    {
+      "id": 1,
+      "start": 8.700000000000001,
+      "end": 12.1,
+      "text": "the",
+      "speaker": "unknown"
+    }
+  ],
+  "full_text": "Hello, hello, hello, we're on\nthe"
+}

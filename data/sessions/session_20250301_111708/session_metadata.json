@@ -1,0 +1,55 @@
+{
+  "session_id": "session_20250301_111708",
+  "start_time": "2025-03-01T11:17:08.956334",
+  "end_time": "2025-03-01T11:18:08.953629",
+  "recordings": [
+    {
+      "filename": "segment_001.wav",
+      "original_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/audio/lab_session_20250301_111708.wav",
+      "path": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/audio/segment_001.wav",
+      "timestamp": "2025-03-01T11:17:25.008481",
+      "duration": 13.908752834467121,
+      "processed": true,
+      "transcript": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/transcripts/segment_001_transcript.json"
+    },
+    {
+      "filename": "segment_002.wav",
+      "original_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/audio/temp_segment_20250301_111751.wav",
+      "path": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/audio/segment_002.wav",
+      "timestamp": "2025-03-01T11:17:51.286228",
+      "duration": 25.611609977324264,
+      "processed": true,
+      "transcript": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/transcripts/segment_002_transcript.json"
+    },
+    {
+      "filename": "segment_003.wav",
+      "original_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/audio/lab_session_20250301_111725.wav",
+      "path": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/audio/segment_003.wav",
+      "timestamp": "2025-03-01T11:18:08.951668",
+      "duration": 25.63482993197279,
+      "processed": true,
+      "transcript": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/transcripts/segment_003_transcript.json"
+    }
+  ],
+  "total_duration": 65.15519274376418,
+  "lab_books": [
+    {
+      "timestamp": "20250301_111805",
+      "title": "Lab Session 2025-03-01",
+      "files": [
+        "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/output/labbook_20250301_111805.md",
+        "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/output/labbook_20250301_111805.docx"
+      ],
+      "duration": 39.52036281179139
+    },
+    {
+      "timestamp": "20250301_111823",
+      "title": "Lab Session 2025-03-01",
+      "files": [
+        "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/output/labbook_20250301_111823.md",
+        "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_111708/output/labbook_20250301_111823.docx"
+      ],
+      "duration": 65.15519274376418
+    }
+  ]
+}

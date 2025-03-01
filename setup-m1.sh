@@ -7,7 +7,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}Setting up Lab Book Generator for Mac M1...${NC}"
+echo -e "${GREEN}Setting up Enhanced Lab Book Generator...${NC}"
 
 # Create and activate virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
@@ -23,59 +23,87 @@ source venv/bin/activate
 echo -e "${YELLOW}Upgrading pip...${NC}"
 pip install --upgrade pip
 
-# Install core dependencies one by one
+# Install core dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
 
 # PyAudio often needs portaudio on Mac
-echo -e "${YELLOW}Installing portaudio with Homebrew (if needed)...${NC}"
-if ! brew list portaudio &>/dev/null; then
-    brew install portaudio
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo -e "${YELLOW}Installing portaudio with Homebrew (if needed)...${NC}"
+    if command -v brew &> /dev/null; then
+        if ! brew list portaudio &>/dev/null; then
+            brew install portaudio
+        fi
+    else
+        echo -e "${RED}Homebrew not found. Please install Homebrew to continue.${NC}"
+        exit 1
+    fi
 fi
 
-# Install Python packages with error handling
-install_package() {
-    echo -e "${YELLOW}Installing $1...${NC}"
-    if pip install $1; then
-        echo -e "${GREEN}Successfully installed $1${NC}"
+# Sound related packages
+pip install pyaudio
+pip install sounddevice
+pip install pydub
+pip install noisereduce
+
+# Whisper for speech recognition
+echo -e "${YELLOW}Installing Whisper from GitHub...${NC}"
+pip install git+https://github.com/openai/whisper.git
+
+# FFmpeg is required for Whisper
+if ! command -v ffmpeg &> /dev/null; then
+    echo -e "${YELLOW}Installing FFmpeg...${NC}"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        brew install ffmpeg
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        sudo apt-get update && sudo apt-get install -y ffmpeg
     else
-        echo -e "${RED}Failed to install $1${NC}"
-        return 1
+        echo -e "${RED}Please install FFmpeg manually for your system${NC}"
     fi
-}
+fi
 
-# Basic audio processing
-install_package pyaudio || echo -e "${YELLOW}Trying alternate method for PyAudio...${NC}" && pip install --global-option='build_ext' --global-option='-I/opt/homebrew/include' --global-option='-L/opt/homebrew/lib' pyaudio
-install_package sounddevice
-install_package pydub
+# Install PyTorch with appropriate backend
+echo -e "${YELLOW}Installing PyTorch...${NC}"
+if [[ "$OSTYPE" == "darwin"* ]] && [[ $(uname -m) == 'arm64' ]]; then
+    # M1/M2 Mac
+    pip install torch torchvision torchaudio
+else
+    # Other systems
+    pip install torch torchvision torchaudio
+fi
 
-# Speech recognition
-echo -e "${YELLOW}Installing OpenAI Whisper...${NC}"
-pip install -U openai-whisper
-
-# Install PyTorch with Apple Metal support
-echo -e "${YELLOW}Installing PyTorch with Apple Metal support...${NC}"
-pip install torch torchvision torchaudio
-
-# Speaker diarization
+# Install PyAnnote for speaker diarization
 echo -e "${YELLOW}Installing PyAnnote Audio...${NC}"
 pip install pyannote.audio
 
 # LLM integration
-echo -e "${YELLOW}Installing LLaMA-cpp with Metal support...${NC}"
-CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python
-install_package transformers
+echo -e "${YELLOW}Installing LLM integration...${NC}"
+if [[ "$OSTYPE" == "darwin"* ]] && [[ $(uname -m) == 'arm64' ]]; then
+    # M1/M2 Mac with Metal support
+    CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python
+else
+    pip install llama-cpp-python
+fi
+pip install transformers
+
+# Keyboard control
+echo -e "${YELLOW}Installing keyboard control...${NC}"
+pip install keyboard
 
 # Image processing
-install_package Pillow
-install_package opencv-python
+pip install Pillow
+pip install opencv-python
 
 # Document generation
-install_package python-docx
-install_package markdown
-install_package fpdf
+pip install python-docx
+pip install markdown
+pip install fpdf
 
 # Utilities
-install_package numpy
-install_package tqdm
+pip install numpy
+pip install tqdm
 
-echo -e "${GREEN}Setup complete! Activate the environment with: source venv/bin/activate${NC}"
+echo -e "${GREEN}Setup complete!${NC}"
+echo -e "${YELLOW}Important:${NC} For Ollama integration, ensure Ollama is installed and running."
+echo -e "Visit https://ollama.com/ to download Ollama, then run 'ollama serve' in another terminal."
+echo -e "Install the model with: ${GREEN}ollama pull llama3.2${NC}"
+echo -e "\nTo start the lab book generator, run: ${GREEN}python main.py --record${NC}"
