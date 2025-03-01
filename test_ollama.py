@@ -14,8 +14,23 @@ def test_ollama_connection():
             
             if "models" in data:
                 print("\nAvailable models:")
+                models_by_base = {}
+                
+                # Group models by base name (without tags)
                 for model in data["models"]:
-                    print(f"  - {model['name']}")
+                    name = model["name"]
+                    base_name = name.split(":")[0] if ":" in name else name
+                    
+                    if base_name not in models_by_base:
+                        models_by_base[base_name] = []
+                    models_by_base[base_name].append(name)
+                
+                # Print models organized by base name
+                for base_name, variants in models_by_base.items():
+                    if len(variants) == 1:
+                        print(f"  - {variants[0]}")
+                    else:
+                        print(f"  - {base_name} (variants: {', '.join(variants)})")
             return True
         else:
             print(f"❌ Failed to connect to Ollama: {response.status_code}")

@@ -13,6 +13,7 @@ class LLMInterface:
         self.model_path = model_path or LLM_MODEL_PATH
         self.use_ollama = False
         self.ollama_model = None
+        self.llm = None  # Initialize to None for all cases
         
         # Check if we're using Ollama
         if self.model_path and "ollama:" in self.model_path:
@@ -25,15 +26,24 @@ class LLMInterface:
                 response = requests.get("http://localhost:11434/api/tags")
                 if response.status_code == 200:
                     models = response.json().get("models", [])
-                    available_models = [model["name"] for model in models]
-                    
-                    if self.ollama_model in available_models:
-                        print(f"Ollama model '{self.ollama_model}' is available")
-                    else:
-                        print(f"Warning: Model '{self.ollama_model}' not found in Ollama")
-                        print(f"Available models: {', '.join(available_models)}")
-                        print("Continuing in demo mode")
-                        self.use_ollama = False
+                    available_models = []
+                    for model in models:
+                        name = model["name"]
+                        # Remove tags like ":latest" for comparison
+                        base_name = name.split(":")[0] if ":" in name else name
+                        available_models.append(name)
+                        
+                        # Check if our requested model matches (ignoring tags)
+                        if (self.ollama_model == name or 
+                            self.ollama_model == base_name):
+                            self.ollama_model = name  # Use the full name including tag
+                            print(f"Ollama model '{name}' is available")
+                            return
+                        
+                    print(f"Warning: Model '{self.ollama_model}' not found in Ollama")
+                    print(f"Available models: {', '.join(available_models)}")
+                    print("Continuing in demo mode")
+                    self.use_ollama = False
             except Exception as e:
                 print(f"Error connecting to Ollama: {e}")
                 print("Make sure Ollama is running (run 'ollama serve' in another terminal)")
@@ -46,14 +56,12 @@ class LLMInterface:
         if not self.model_path:
             print("Warning: No LLM model path specified. Please set LLM_MODEL_PATH in config.py")
             print("Running in demo mode - responses will be placeholders")
-            self.llm = None
             return
             
         # Check if model file exists for local GGUF models
         if not os.path.exists(self.model_path):
             print(f"Warning: LLM model not found at {self.model_path}")
             print("Running in demo mode - responses will be placeholders")
-            self.llm = None
             return
         
         print(f"Loading LLM model from {self.model_path}...")
@@ -69,7 +77,6 @@ class LLMInterface:
         except Exception as e:
             print(f"Error loading LLM model: {e}")
             print("Running in demo mode - responses will be placeholders")
-            self.llm = None
     
     def generate_lab_book(self, transcript, custom_template=None):
         """Generate a structured lab book from transcript using the LLM"""
@@ -111,28 +118,28 @@ class LLMInterface:
                 return self._generate_demo_lab_book(transcript)
         
         # Use llama-cpp-python if available
-        if not self.llm:
-            print("Using demo mode for lab book generation")
-            return self._generate_demo_lab_book(transcript)
-        
-        # Generate response from llama-cpp-python LLM
-        try:
-            print("Generating lab book content...")
-            response = self.llm(
-                prompt,
-                max_tokens=LLM_MAX_TOKENS,
-                temperature=LLM_TEMPERATURE,
-                echo=False
-            )
+        if self.llm:
+            try:
+                print("Generating lab book content...")
+                response = self.llm(
+                    prompt,
+                    max_tokens=LLM_MAX_TOKENS,
+                    temperature=LLM_TEMPERATURE,
+                    echo=False
+                )
+                
+                # Extract generated text
+                generated_text = response["choices"][0]["text"]
+                return generated_text.strip()
             
-            # Extract generated text
-            generated_text = response["choices"][0]["text"]
-            return generated_text.strip()
+            except Exception as e:
+                print(f"Error generating lab book: {e}")
+                print("Falling back to demo mode")
+                return self._generate_demo_lab_book(transcript)
         
-        except Exception as e:
-            print(f"Error generating lab book: {e}")
-            print("Falling back to demo mode")
-            return self._generate_demo_lab_book(transcript)
+        # If we get here, use demo mode
+        print("Using demo mode for lab book generation")
+        return self._generate_demo_lab_book(transcript)
     
     def analyze_image(self, image_path, transcript_context=None):
         """Analyze an image (graph, plot, etc.) and generate a description"""
@@ -146,11 +153,11 @@ class LLMInterface:
             # Ollama doesn't support multimodal yet in this interface
             return f"[Analysis of {os.path.basename(image_path)} - multimodal analysis would be generated here]"
             
-        if not self.llm:
-            return f"[Placeholder image analysis for {os.path.basename(image_path)}]"
+        if self.llm:
+            return f"[Analysis of {os.path.basename(image_path)} would be generated with the local LLM]"
             
-        # In a real implementation, this would use a multimodal model
-        return f"[Analysis of {os.path.basename(image_path)} would be generated here using a multimodal model]"
+        # Default placeholder
+        return f"[Placeholder image analysis for {os.path.basename(image_path)}]"
     
     def _generate_demo_lab_book(self, transcript):
         """Generate a simple demo lab book when no LLM is available"""
