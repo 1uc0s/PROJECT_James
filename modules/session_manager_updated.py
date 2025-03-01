@@ -242,7 +242,8 @@ class SessionManager:
             
         if output_format in ['docx', 'both']:
             docx_file = os.path.join(output_dir, f"labbook_{self.session_id}_{timestamp}.docx")
-            self.doc_generator.generate_docx(lab_book_content, title, docx_file)
+            # Fix here: Pass the output path as a parameter instead of positional argument
+            self.doc_generator.generate_docx(lab_book_content, title, output_path=docx_file)
             output_files.append(docx_file)
         
         # Update metadata

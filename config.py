@@ -37,13 +37,13 @@ SILENCE_THRESHOLD = 500
 SILENCE_DURATION = 3  # seconds
 
 # LLM settings
-LLM_MODEL_PATH = "ollama:llama3.2"  # Using Ollama with llama3.2
+LLM_MODEL_PATH = "deepseek-r1:1.5b"  # Using Ollama with llama3.2
 LLM_CONTEXT_SIZE = 4096
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 2048
 
 # Speaker diarization settings
-USE_HF_API = False  # Whether to use HuggingFace API for diarization
+USE_HF_API = True  # Whether to use HuggingFace API for diarization
 PRIMARY_SPEAKER = "You"  # Label for the primary speaker
 
 # Lab cycle settings

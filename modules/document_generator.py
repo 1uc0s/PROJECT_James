@@ -59,12 +59,17 @@ class DocumentGenerator:
         print(f"Markdown lab book saved to {filename}")
         return filename
     
-    def generate_docx(self, content, title=None):
+    def generate_docx(self, content, title=None, output_path=None):
         """Generate a Word document from Markdown content with colored text"""
         # Create a timestamp for the filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         title = title or f"Lab Book Entry {timestamp}"
-        filename = os.path.join(OUTPUT_DIR, f"labbook_{timestamp}.docx")
+        
+        # Use provided output_path or generate a default filename
+        if output_path is None:
+            filename = os.path.join(OUTPUT_DIR, f"labbook_{timestamp}.docx")
+        else:
+            filename = output_path
         
         # Create a new Document
         doc = Document()

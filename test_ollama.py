@@ -75,6 +75,6 @@ if __name__ == "__main__":
         if len(sys.argv) > 1:
             model_name = sys.argv[1]
         else:
-            model_name = "llama3.2"  # Default model to test
+            model_name = "deepseek-r1:8b"  # Default model to test
         
         test_model_generation(model_name)
