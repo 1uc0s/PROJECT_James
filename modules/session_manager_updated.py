@@ -131,8 +131,9 @@ class SessionManager:
             return self.generate_labbook()
         
         return None
-    
-    def generate_labbook(self, output_format="both", custom_prompt=None):
+# Fix for SessionManager - adding explicit post-processing
+
+    def generate_labbook(self, output_format="both", custom_prompt=None, post_process=None):
         """Generate a lab book from all recordings in the session"""
         # Initialize processors if needed
         if not self.speech_processor:
@@ -180,6 +181,137 @@ class SessionManager:
                     
                 except Exception as e:
                     print(f"Error processing recording {recording['filename']}: {e}")
+        
+        # Save updated metadata
+        self._save_metadata()
+        
+        # Generate combined transcript
+        full_transcript = self._combine_transcripts()
+        
+        if not full_transcript:
+            print("No transcript data available to generate lab book")
+            return None
+        
+        # Get RAG context if this session is part of a lab cycle
+        rag_context = ""
+        if self.cycle_id and self.lab_cycle_manager:
+            try:
+                # Use the first 1000 characters of transcript as query
+                query = full_transcript[:1000]
+                rag_context = self.lab_cycle_manager.get_knowledge_context(
+                    self.cycle_id, query, max_results=3, format_for_prompt=True
+                )
+                if rag_context:
+                    print("Retrieved relevant context from previous sessions in this lab cycle")
+            except Exception as e:
+                print(f"Error retrieving RAG context: {e}")
+        
+        # Extract external comments if available
+        external_comments = ""
+        for transcript in self.transcripts:
+            if "external_text" in transcript:
+                external_comments += transcript["external_text"] + "\n\n"
+        
+        # Generate lab book using LLM
+        print("Generating lab book from combined transcripts...")
+        lab_book_content = self.llm.generate_lab_book(
+            full_transcript, 
+            custom_prompt, 
+            rag_context=rag_context,
+            external_comments=external_comments
+        )
+        
+        # Extract title or create default
+        title = None
+        if lab_book_content:
+            lines = lab_book_content.split('\n')
+            if lines and lines[0].startswith('# '):
+                title = lines[0][2:].strip()
+        
+        if not title:
+            title = f"Lab Session {datetime.now().strftime('%Y-%m-%d')}"
+        
+        # Generate output files
+        output_files = []
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Determine output directory
+        if self.cycle_id:
+            output_dir = self.cycle_paths["lab_books"]
+        else:
+            output_dir = os.path.join(self.session_dir, "lab_books")
+            os.makedirs(output_dir, exist_ok=True)
+        
+        if output_format in ['markdown', 'both']:
+            md_file = os.path.join(output_dir, f"labbook_{self.session_id}_{timestamp}.md")
+            with open(md_file, 'w') as f:
+                f.write(lab_book_content)
+            output_files.append(md_file)
+            
+        if output_format in ['docx', 'both']:
+            docx_file = os.path.join(output_dir, f"labbook_{self.session_id}_{timestamp}.docx")
+            # Fix here: Pass the output path as a parameter instead of positional argument
+            self.doc_generator.generate_docx(lab_book_content, title, output_path=docx_file)
+            output_files.append(docx_file)
+        
+        # Update metadata
+        labbook_info = {
+            "timestamp": timestamp,
+            "title": title,
+            "files": output_files,
+            "duration": self.metadata["total_duration"]
+        }
+        self.metadata["lab_books"].append(labbook_info)
+        self._save_metadata()
+        
+        # If part of a lab cycle, add the lab book to the knowledge base
+        if self.cycle_id and self.lab_cycle_manager and output_format in ['markdown', 'both']:
+            try:
+                # Add to knowledge base
+                document_id = self.lab_cycle_manager.add_document_to_knowledge_base(
+                    self.cycle_id,
+                    lab_book_content,
+                    title=title,
+                    document_id=f"labbook_{self.session_id}_{timestamp}",
+                    metadata={"session_id": self.session_id}
+                )
+                
+                # Rebuild the index
+                self.lab_cycle_manager.build_knowledge_base_index(self.cycle_id)
+                print(f"Added lab book to knowledge base and updated index")
+            except Exception as e:
+                print(f"Error adding lab book to knowledge base: {e}")
+        
+        # Perform post-processing if requested
+        # If post_process parameter is None, use the default from config
+        from config import DEFAULT_POST_PROCESS, DEFAULT_API_PROVIDER
+        should_post_process = DEFAULT_POST_PROCESS if post_process is None else post_process
+        
+        if should_post_process:
+            print("\nPost-processing lab book with advanced LLM...")
+            try:
+                analysis = self.llm.post_process_with_external_api(
+                    lab_book_content, 
+                    api_provider=DEFAULT_API_PROVIDER
+                )
+                
+                # Save analysis to file
+                analysis_file = os.path.join(output_dir, f"analysis_{self.session_id}_{timestamp}.md")
+                
+                with open(analysis_file, 'w') as f:
+                    f.write(f"# Analysis of Lab Book: {title}\n\n")
+                    f.write(analysis)
+                
+                print(f"Analysis saved to: {analysis_file}")
+                output_files.append(analysis_file)
+            except Exception as e:
+                print(f"Error during post-processing: {e}")
+                print("Continuing without post-processing analysis")
+        else:
+            print("\nPost-processing skipped (no API keys available or disabled)")
+        
+        print(f"Lab book generated: {', '.join(output_files)}")
+        return output_files
         
         # Save updated metadata
         self._save_metadata()

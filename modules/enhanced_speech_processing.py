@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 from config import TRANSCRIPT_DIR, DATA_DIR
 
 class EnhancedSpeechProcessor:
-    def __init__(self, diarization_model="pyannote/speaker-diarization@2.1", whisper_model="base", 
+    def __init__(self, diarization_model="pyannote/speaker-diarization@3.1", whisper_model="base", 
                  primary_speaker=None, use_hf_api=False, hf_token=None):
         """Initialize the enhanced speech processor
         
