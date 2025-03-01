@@ -85,9 +85,9 @@ class EnhancedSpeechProcessor:
                 )
                 
                 # Move to appropriate device
-                if str(self.device) == "mps":
+                if self.device == torch.device("mps"):
                     # PyAnnote might not support MPS directly
-                    self.diarization = self.diarization.to("cpu")
+                    self.diarization = self.diarization.to(torch.device("cpu"))
                 else:
                     self.diarization = self.diarization.to(self.device)
                     

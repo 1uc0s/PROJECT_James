@@ -23,8 +23,18 @@ class LLMInterface:
         print(f"Initializing LLM interface with model path: {self.model_path}")
         
         # Check if we're using Ollama
-        if self.model_path and isinstance(self.model_path, str) and "ollama:" in self.model_path:
-            self.ollama_model = self.model_path.split("ollama:")[1]
+        if self.model_path and isinstance(self.model_path, str) and (
+            "ollama:" in self.model_path or 
+            # Add condition to recognize direct model names
+            (not os.path.exists(self.model_path) and ":" in self.model_path)
+        ):
+            # If it includes ollama: prefix, extract model name
+            if "ollama:" in self.model_path:
+                self.ollama_model = self.model_path.split("ollama:")[1]
+            else:
+                # Otherwise use the whole string as model name
+                self.ollama_model = self.model_path
+            
             self.use_ollama = True
             print(f"Using Ollama with model: {self.ollama_model}")
             
