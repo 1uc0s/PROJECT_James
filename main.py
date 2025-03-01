@@ -479,8 +479,8 @@ def main():
     parser.add_argument('--cycle-id', type=str, help='Specify a lab cycle ID')
     parser.add_argument('--context-size', type=int, default=8192, 
                         help='Context size for the LLM (for large transcripts)')
-    parser.add_argument('--cycle-title', type=str, help='Title for new lab cycle')
-    parser.add_argument('--cycle-desc', type=str, help='Description for new lab cycle')
+    parser.add_argument('--cycle-title', type=str, help='Title for new lab cycle', default='Untitled')
+    parser.add_argument('--cycle-desc', type=str, help='Description for new lab cycle', default='')
     parser.add_argument('--post-process', action='store_true', default=DEFAULT_POST_PROCESS,
                         help='Post-process with advanced LLM API')
     parser.add_argument('--no-post-process', action='store_true',

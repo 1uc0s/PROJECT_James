@@ -1,12 +1,11 @@
-# modules/session_manager.py - Updated for lab cycle support
+# modules/session_manager.py - Updated for simplified folder structure
 import os
 import json
 import time
 import shutil
 from datetime import datetime
-import glob
 
-from config import AUDIO_DIR, DATA_DIR
+from config import TEMP_DIR, get_cycle_paths, LAB_CYCLES_DIR
 from modules.speech_processing import SpeechProcessor
 from modules.llm_interface_updated import LLMInterface
 from modules.document_generator import DocumentGenerator
@@ -32,21 +31,18 @@ class SessionManager:
                 print(f"Warning: Lab cycle '{cycle_id}' not found. Creating new session without cycle.")
                 self.cycle_id = None
         
-        # Create session directory (either in a cycle or in the default location)
+        # Get paths for this session
         if self.cycle_id:
-            self.session_dir = os.path.join(DATA_DIR, "lab_cycles", self.cycle_id, "sessions", self.session_id)
+            # Use cycle-specific paths
+            self.cycle_paths = get_cycle_paths(self.cycle_id)
+            self.session_dir = os.path.join(self.cycle_paths["root"], "sessions", self.session_id)
         else:
-            self.session_dir = os.path.join(DATA_DIR, "sessions", self.session_id)
-            
-        self.session_audio_dir = os.path.join(self.session_dir, "audio")
-        self.session_transcript_dir = os.path.join(self.session_dir, "transcripts")
-        self.session_output_dir = os.path.join(self.session_dir, "output")
+            # Use temporary directory if no cycle
+            self.cycle_paths = None
+            self.session_dir = os.path.join(TEMP_DIR, "sessions", self.session_id)
         
-        # Create directories
+        # Create session directory
         os.makedirs(self.session_dir, exist_ok=True)
-        os.makedirs(self.session_audio_dir, exist_ok=True)
-        os.makedirs(self.session_transcript_dir, exist_ok=True)
-        os.makedirs(self.session_output_dir, exist_ok=True)
         
         # Initialize session data
         self.recordings = []
@@ -87,11 +83,18 @@ class SessionManager:
             print(f"Warning: Audio file not found: {audio_file}")
             return False
             
-        # Copy to session directory with sequential naming
+        # Copy to appropriate directory with sequential naming
         filename = os.path.basename(audio_file)
         base_name, ext = os.path.splitext(filename)
         new_filename = f"segment_{len(self.recordings) + 1:03d}{ext}"
-        destination = os.path.join(self.session_audio_dir, new_filename)
+        
+        # Determine destination path based on cycle
+        if self.cycle_id:
+            destination = os.path.join(self.cycle_paths["audio"], new_filename)
+        else:
+            audio_dir = os.path.join(self.session_dir, "audio")
+            os.makedirs(audio_dir, exist_ok=True)
+            destination = os.path.join(audio_dir, new_filename)
         
         # Copy the file
         shutil.copy2(audio_file, destination)
@@ -147,12 +150,21 @@ class SessionManager:
                     # Process audio
                     transcript_file, transcript_data = self.speech_processor.process_audio(recording["path"])
                     
-                    # Save transcript to session directory
+                    # Save transcript to appropriate directory
                     base_name = os.path.splitext(recording["filename"])[0]
-                    session_transcript = os.path.join(
-                        self.session_transcript_dir, 
-                        f"{base_name}_transcript.json"
-                    )
+                    
+                    if self.cycle_id:
+                        session_transcript = os.path.join(
+                            self.cycle_paths["transcripts"], 
+                            f"{base_name}_transcript.json"
+                        )
+                    else:
+                        transcript_dir = os.path.join(self.session_dir, "transcripts")
+                        os.makedirs(transcript_dir, exist_ok=True)
+                        session_transcript = os.path.join(
+                            transcript_dir, 
+                            f"{base_name}_transcript.json"
+                        )
                     
                     # Copy transcript
                     with open(transcript_file, 'r') as src:
@@ -215,18 +227,23 @@ class SessionManager:
         output_files = []
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
+        # Determine output directory
+        if self.cycle_id:
+            output_dir = self.cycle_paths["lab_books"]
+        else:
+            output_dir = os.path.join(self.session_dir, "lab_books")
+            os.makedirs(output_dir, exist_ok=True)
+        
         if output_format in ['markdown', 'both']:
-            md_file = os.path.join(self.session_output_dir, f"labbook_{timestamp}.md")
+            md_file = os.path.join(output_dir, f"labbook_{self.session_id}_{timestamp}.md")
             with open(md_file, 'w') as f:
                 f.write(lab_book_content)
             output_files.append(md_file)
             
         if output_format in ['docx', 'both']:
-            docx_file = self.doc_generator.generate_docx(lab_book_content, title)
-            # Copy to session directory
-            session_docx = os.path.join(self.session_output_dir, f"labbook_{timestamp}.docx")
-            shutil.copy2(docx_file, session_docx)
-            output_files.append(session_docx)
+            docx_file = os.path.join(output_dir, f"labbook_{self.session_id}_{timestamp}.docx")
+            self.doc_generator.generate_docx(lab_book_content, title, docx_file)
+            output_files.append(docx_file)
         
         # Update metadata
         labbook_info = {
@@ -295,26 +312,43 @@ class SessionManager:
     @classmethod
     def list_sessions(cls, cycle_id=None):
         """List all available sessions, optionally filtered by cycle_id"""
+        sessions = []
+        
         if cycle_id:
             # List sessions in a specific cycle
-            sessions_dir = os.path.join(DATA_DIR, "lab_cycles", cycle_id, "sessions")
+            cycle_dir = os.path.join(LAB_CYCLES_DIR, cycle_id)
+            sessions_dir = os.path.join(cycle_dir, "sessions")
+            if os.path.exists(sessions_dir):
+                cls._add_sessions_from_dir(sessions_dir, sessions, cycle_id)
         else:
-            # List all sessions
-            sessions_dir = os.path.join(DATA_DIR, "sessions")
-        
-        if not os.path.exists(sessions_dir):
-            return []
+            # List all sessions from all cycles
+            if os.path.exists(LAB_CYCLES_DIR):
+                for cycle_dir in os.listdir(LAB_CYCLES_DIR):
+                    cycle_path = os.path.join(LAB_CYCLES_DIR, cycle_dir)
+                    if os.path.isdir(cycle_path):
+                        sessions_dir = os.path.join(cycle_path, "sessions")
+                        if os.path.exists(sessions_dir):
+                            cls._add_sessions_from_dir(sessions_dir, sessions, cycle_dir)
             
-        sessions = []
+            # Also check temporary sessions
+            temp_sessions_dir = os.path.join(TEMP_DIR, "sessions")
+            if os.path.exists(temp_sessions_dir):
+                cls._add_sessions_from_dir(temp_sessions_dir, sessions, None)
+        
+        return sessions
+    
+    @staticmethod
+    def _add_sessions_from_dir(sessions_dir, sessions_list, cycle_id):
+        """Helper to add sessions from a directory to the list"""
         for session_dir in os.listdir(sessions_dir):
             metadata_file = os.path.join(sessions_dir, session_dir, "session_metadata.json")
             if os.path.exists(metadata_file):
                 try:
                     with open(metadata_file, 'r') as f:
                         metadata = json.load(f)
-                    sessions.append({
+                    sessions_list.append({
                         "session_id": metadata["session_id"],
-                        "cycle_id": metadata.get("cycle_id"),
+                        "cycle_id": metadata.get("cycle_id", cycle_id),
                         "start_time": metadata["start_time"],
                         "end_time": metadata["end_time"],
                         "recordings": len(metadata["recordings"]),
@@ -323,64 +357,49 @@ class SessionManager:
                     })
                 except Exception as e:
                     print(f"Error loading session metadata for {session_dir}: {e}")
-        
-        # If no cycle_id was specified, also check cycles for sessions
-        if not cycle_id:
-            cycles_dir = os.path.join(DATA_DIR, "lab_cycles")
-            if os.path.exists(cycles_dir):
-                for cycle_dir in os.listdir(cycles_dir):
-                    cycle_sessions_dir = os.path.join(cycles_dir, cycle_dir, "sessions")
-                    if os.path.exists(cycle_sessions_dir):
-                        for session_dir in os.listdir(cycle_sessions_dir):
-                            metadata_file = os.path.join(cycle_sessions_dir, session_dir, "session_metadata.json")
-                            if os.path.exists(metadata_file):
-                                try:
-                                    with open(metadata_file, 'r') as f:
-                                        metadata = json.load(f)
-                                    sessions.append({
-                                        "session_id": metadata["session_id"],
-                                        "cycle_id": metadata.get("cycle_id", cycle_dir),
-                                        "start_time": metadata["start_time"],
-                                        "end_time": metadata["end_time"],
-                                        "recordings": len(metadata["recordings"]),
-                                        "total_duration": metadata["total_duration"],
-                                        "lab_books": len(metadata["lab_books"])
-                                    })
-                                except Exception as e:
-                                    print(f"Error loading session metadata for {session_dir} in cycle {cycle_dir}: {e}")
-        
-        return sessions
     
     @classmethod
     def load_session(cls, session_id, cycle_id=None, whisper_model="base", llm_model=None):
         """Load an existing session"""
+        # Try to find the session
         if cycle_id:
             # Look in the specified cycle
-            session_dir = os.path.join(DATA_DIR, "lab_cycles", cycle_id, "sessions", session_id)
-        else:
-            # Try the default location first
-            session_dir = os.path.join(DATA_DIR, "sessions", session_id)
-            
-            # If not found, search through cycles
-            if not os.path.exists(session_dir):
-                cycles_dir = os.path.join(DATA_DIR, "lab_cycles")
-                if os.path.exists(cycles_dir):
-                    for cycle_dir in os.listdir(cycles_dir):
-                        cycle_session_dir = os.path.join(cycles_dir, cycle_dir, "sessions", session_id)
-                        if os.path.exists(cycle_session_dir):
-                            session_dir = cycle_session_dir
-                            cycle_id = cycle_dir
-                            break
+            cycle_dir = os.path.join(LAB_CYCLES_DIR, cycle_id)
+            session_dir = os.path.join(cycle_dir, "sessions", session_id)
+            if os.path.exists(session_dir):
+                return cls._load_session_from_dir(session_dir, cycle_id, whisper_model, llm_model)
         
-        if not os.path.exists(session_dir):
-            raise ValueError(f"Session '{session_id}' not found")
-            
+        # If not found or no cycle specified, search all cycles
+        if os.path.exists(LAB_CYCLES_DIR):
+            for cycle_dir in os.listdir(LAB_CYCLES_DIR):
+                cycle_path = os.path.join(LAB_CYCLES_DIR, cycle_dir)
+                if os.path.isdir(cycle_path):
+                    session_dir = os.path.join(cycle_path, "sessions", session_id)
+                    if os.path.exists(session_dir):
+                        return cls._load_session_from_dir(session_dir, cycle_dir, whisper_model, llm_model)
+        
+        # Check temp directory
+        temp_session_dir = os.path.join(TEMP_DIR, "sessions", session_id)
+        if os.path.exists(temp_session_dir):
+            return cls._load_session_from_dir(temp_session_dir, None, whisper_model, llm_model)
+        
+        # Not found anywhere
+        raise ValueError(f"Session '{session_id}' not found")
+    
+    @classmethod
+    def _load_session_from_dir(cls, session_dir, cycle_id, whisper_model, llm_model):
+        """Helper to load a session from a directory"""
         metadata_file = os.path.join(session_dir, "session_metadata.json")
         if not os.path.exists(metadata_file):
-            raise ValueError(f"Session metadata not found for '{session_id}'")
+            raise ValueError(f"Session metadata not found in {session_dir}")
             
         # Create new session manager
-        session = cls(session_id, cycle_id, whisper_model, llm_model)
+        session = cls(
+            session_id = os.path.basename(session_dir),
+            cycle_id = cycle_id,
+            whisper_model = whisper_model,
+            llm_model = llm_model
+        )
         
         # Load metadata
         with open(metadata_file, 'r') as f:
@@ -400,5 +419,5 @@ class SessionManager:
                     except Exception as e:
                         print(f"Error loading transcript {recording['transcript']}: {e}")
         
-        print(f"Loaded session '{session_id}' with {len(session.recordings)} recordings")
+        print(f"Loaded session '{session.session_id}' with {len(session.recordings)} recordings")
         return session

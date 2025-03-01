@@ -1,4 +1,4 @@
-# modules/llm_interface.py - Updated with RAG and API support
+# modules/llm_interface_updated.py
 import os
 import json
 import requests
@@ -7,7 +7,8 @@ import re
 
 from config import (
     LLM_MODEL_PATH, LLM_CONTEXT_SIZE, LLM_TEMPERATURE, LLM_MAX_TOKENS, 
-    LAB_BOOK_PROMPT, IMAGE_ANALYSIS_PROMPT, EXTERNAL_API_KEYS
+    LAB_BOOK_PROMPT, IMAGE_ANALYSIS_PROMPT, EXTERNAL_API_KEYS,
+    POST_PROCESSING_PROMPT
 )
 
 class LLMInterface:
@@ -205,49 +206,53 @@ class LLMInterface:
     
     def _create_post_processing_prompt(self, lab_book_content):
         """Create a prompt for post-processing analysis"""
-        prompt = f"""
-You are a scientific advisor helping a student improve their lab book and experiment.
-Please analyze the following lab book content and provide:
-
-1. A brief summary of the experiment and its findings
-2. Three specific strengths in the approach or documentation
-3. Three areas that could be improved or expanded upon
-4. Suggestions for follow-up experiments or additional analyses
-5. Any potential scientific misconceptions or errors that should be addressed
-
-Be specific, constructive, and educational in your feedback.
-
-LAB BOOK CONTENT:
-
-{lab_book_content}
-
-ANALYSIS:
-"""
-        return prompt
+        # Use the configured post-processing prompt
+        return POST_PROCESSING_PROMPT.format(lab_book=lab_book_content)
     
+    # Partial fix for modules/llm_interface_updated.py
+
     def _process_with_openai(self, prompt, api_keys, max_tokens):
         """Process content using OpenAI API"""
         try:
-            import openai
+            print(f"Making request to OpenAI API with API key: {api_keys.get('api_key')[:4]}...")
             
-            openai.api_key = api_keys.get("api_key")
+            # Use requests directly instead of the openai library for more explicit error handling
+            import requests
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_keys.get('api_key')}"
+            }
             
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
+            payload = {
+                "model": "gpt-4",
+                "messages": [
                     {"role": "system", "content": "You are a helpful scientific advisor."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=max_tokens,
-                temperature=0.7
+                "max_tokens": max_tokens,
+                "temperature": 0.7
+            }
+            
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=payload
             )
             
-            return response.choices[0].message.content
-            
+            if response.status_code == 200:
+                result = response.json()
+                content = result["choices"][0]["message"]["content"]
+                print("OpenAI API request successful")
+                return content
+            else:
+                print(f"OpenAI API Error: Status code {response.status_code}")
+                print(f"Response: {response.text}")
+                return self._generate_demo_analysis(prompt)
+                
         except Exception as e:
             print(f"Error using OpenAI API: {e}")
             return self._generate_demo_analysis(prompt)
-    
+        
     def _process_with_anthropic(self, prompt, api_keys, max_tokens):
         """Process content using Anthropic API"""
         try:
@@ -294,36 +299,24 @@ ANALYSIS:
         
         participants_str = ", ".join(participants) if participants else "Unknown Participants"
         
-        # Create a simple structured lab book
+        # Create a simple structured lab book with the new format
         return f"""# Lab Experiment Session
 
 **Date:** {datetime.now().strftime("%Y-%m-%d")}
 
 **Participants:** {participants_str}
 
-## Objectives
-[This section would be extracted from the transcript by the LLM]
+## Aims
+[This section would outline what the experiment planned to investigate]
 
-## Materials and Methods
-[This section would be extracted from the transcript by the LLM]
+## Choices
+[This section would document key decisions made during the lab session]
 
-## Procedure
-[This section would be extracted from the transcript by the LLM]
+## Summary
+[This section would summarize the main discoveries and learnings]
 
-## Observations
-[This section would be extracted from the transcript by the LLM]
-
-## Results
-[This section would be extracted from the transcript by the LLM]
-
-## Analysis
-[This section would be extracted from the transcript by the LLM]
-
-## Conclusions
-[This section would be extracted from the transcript by the LLM]
-
-## Next Steps
-[This section would be extracted from the transcript by the LLM]
+## Questions
+[This section would list areas needing further investigation]
 
 ---
 Note: This is a demo lab book. For full functionality, please ensure Ollama is running with your preferred model.
@@ -332,26 +325,20 @@ Note: This is a demo lab book. For full functionality, please ensure Ollama is r
     def _generate_demo_analysis(self, lab_book_content):
         """Generate a demo analysis when no API is available"""
         return """
-# Lab Book Analysis
+1. AIMS AND OVERVIEW
+This experiment appears to focus on investigating a specific scientific phenomenon, with clear methodology but some limitations in scope.
 
-## Summary
-This lab book documents an experiment that appears to be well-structured but could benefit from some refinements in methodology and analysis.
+2. ANALYSIS OF KEY CHOICES
+The experimental design shows thoughtful selection of parameters, though additional controls might have strengthened the results. The methods chosen are appropriate for the stated aims.
 
-## Strengths
-1. Clear organization with appropriate sections following scientific method
-2. Detailed procedure that appears to be chronological and thorough
-3. Inclusion of specific measurements and observations
+3. ASSESSMENT OF FINDINGS
+The results demonstrate a relationship between the tested variables, though statistical significance could be more rigorously established. The interpretation aligns with current scientific understanding.
 
-## Areas for Improvement
-1. The objectives could be more specific and include quantifiable success criteria
-2. The results section would benefit from more statistical analysis and error estimates
-3. Consider adding visual elements like graphs or diagrams to illustrate key findings
+4. SUGGESTED FOLLOW-UP
+Further investigation should explore: 
+- How different conditions affect the observed phenomenon
+- Whether the findings generalize to related systems
+- More precise measurement techniques to reduce uncertainty
 
-## Suggested Follow-up Experiments
-1. Repeat the experiment with modified parameters to test the robustness of the findings
-2. Conduct a control experiment to isolate the variables being tested
-3. Apply the methods to a related system or material to expand the scope of research
-
-## Note
-This is a demo analysis. For comprehensive feedback, please configure an external API like OpenAI or Anthropic in your config file.
+Note: This is a demo analysis. For comprehensive feedback, please configure an external API in your config file.
 """

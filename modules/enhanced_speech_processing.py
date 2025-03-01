@@ -51,11 +51,14 @@ class EnhancedSpeechProcessor:
             self.use_hf_api = False
         
         # Initialize speaker diarization based on configuration
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        # For M1 Macs, try to use MPS (Metal Performance Shaders)
-        if torch.backends.mps.is_available():
-            self.device = "mps"
+        # FIX: Properly initialize device as torch.device object
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
             print("Using Apple Metal (MPS) for acceleration")
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
             
         try:
             print(f"Loading diarization model on {self.device}...")
@@ -70,7 +73,8 @@ class EnhancedSpeechProcessor:
                 )
                 
                 # Move to appropriate device
-                if self.device == "mps":
+                # FIX: Use str(self.device) for comparison to handle torch.device object
+                if str(self.device) == "mps":
                     # PyAnnote might not support MPS directly
                     self.diarization = self.diarization.to("cpu")
                 else:

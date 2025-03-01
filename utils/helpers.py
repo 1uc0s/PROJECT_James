@@ -34,9 +34,12 @@ def extract_title_from_content(content):
     
     return None
 
-def timestamp_string():
-    """Return a formatted timestamp string"""
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+def timestamp_string(include_seconds=False):
+    """Return a formatted timestamp string with dashes instead of underscores"""
+    if include_seconds:
+        return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    else:
+        return datetime.now().strftime("%Y-%m-%d_%H-%M")
 
 def save_json(data, filepath):
     """Save data as JSON to the specified file"""
@@ -124,6 +127,7 @@ def parse_lab_book_sections(content):
 if __name__ == "__main__":
     # Test timestamp
     print(f"Current timestamp: {timestamp_string()}")
+    print(f"Current timestamp with seconds: {timestamp_string(True)}")
     
     # Test get_most_recent_file
     test_dir = os.path.dirname(os.path.abspath(__file__))

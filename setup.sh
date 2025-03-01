@@ -7,7 +7,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}Setting up Enhanced Lab Book Generator V2...${NC}"
+echo -e "${GREEN}Setting up Enhanced Lab Book Generator with Modern Libraries...${NC}"
 
 # Create and activate virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
@@ -45,8 +45,8 @@ pip install sounddevice
 pip install pydub
 pip install noisereduce
 
-# Whisper for speech recognition
-echo -e "${YELLOW}Installing Whisper from GitHub...${NC}"
+# Whisper for speech recognition - latest version
+echo -e "${YELLOW}Installing OpenAI's Whisper (latest)...${NC}"
 pip install git+https://github.com/openai/whisper.git
 
 # FFmpeg is required for Whisper
@@ -61,8 +61,8 @@ if ! command -v ffmpeg &> /dev/null; then
     fi
 fi
 
-# Install PyTorch with appropriate backend
-echo -e "${YELLOW}Installing PyTorch...${NC}"
+# Install latest PyTorch and PyAnnote
+echo -e "${YELLOW}Installing PyTorch and PyAnnote Audio (latest versions)...${NC}"
 if [[ "$OSTYPE" == "darwin"* ]] && [[ $(uname -m) == 'arm64' ]]; then
     # M1/M2 Mac
     pip install torch torchvision torchaudio
@@ -71,11 +71,12 @@ else
     pip install torch torchvision torchaudio
 fi
 
-# Install PyAnnote for speaker diarization
-echo -e "${YELLOW}Installing PyAnnote Audio...${NC}"
+# Install pyannote.audio with direct HuggingFace API access
+echo -e "${YELLOW}Installing PyAnnote Audio (latest)...${NC}"
 pip install pyannote.audio
+pip install hf_transfer
 
-# RAG dependencies (NEW)
+# RAG dependencies
 echo -e "${YELLOW}Installing RAG dependencies...${NC}"
 pip install faiss-cpu
 pip install sentence-transformers
@@ -91,8 +92,8 @@ else
 fi
 pip install transformers
 
-# API clients for post-processing (NEW)
-echo -e "${YELLOW}Installing API clients...${NC}"
+# API clients for post-processing
+echo -e "${YELLOW}Installing API clients for advanced LLMs...${NC}"
 pip install openai
 pip install anthropic
 
@@ -108,20 +109,36 @@ pip install fpdf
 # Utilities
 pip install numpy
 pip install tqdm
+pip install keyboard
 
-echo -e "${GREEN}Setup complete!${NC}"
+echo -e "${GREEN}Setup complete with modern libraries!${NC}"
 echo -e "${YELLOW}Important:${NC} For Ollama integration, ensure Ollama is installed and running."
 echo -e "Visit https://ollama.com/ to download Ollama, then run 'ollama serve' in another terminal."
 echo -e "Install the model with: ${GREEN}ollama pull llama3.2${NC}"
 
-echo -e "\n${YELLOW}New Features:${NC}"
-echo -e "- Lab cycle organization with RAG"
-echo -e "- Enhanced speaker diarization"
-echo -e "- Post-processing with external LLMs (requires API keys)"
+echo -e "\n${YELLOW}Using PyAnnote.audio's latest version${NC}"
+echo -e "Note: If you experience issues with speaker diarization, refer to the compatibility version"
+echo -e "in requirements-compatible.txt, which uses older but more stable versions of PyTorch and PyAnnote."
+
+echo -e "\n${YELLOW}Required for speaker diarization:${NC}"
+echo -e "You need a HuggingFace token to download the speaker diarization model:"
+echo -e "1. Create an account at huggingface.co"
+echo -e "2. Generate a token at huggingface.co/settings/tokens"
+echo -e "3. Run: export HF_TOKEN=your_token_here"
 
 echo -e "\nTo set API keys for post-processing:"
 echo -e "export OPENAI_API_KEY=your_openai_key_here"
 echo -e "export ANTHROPIC_API_KEY=your_anthropic_key_here"
 
-echo -e "\nTo start the lab book generator, run: ${GREEN}python main_updated.py --record${NC}"
-echo -e "To create a new lab cycle: ${GREEN}python main_updated.py --create-cycle cycle1 --cycle-title \"Wave Experiments\"${NC}"
+echo -e "\n${GREEN}Data structure simplified:${NC}"
+echo -e "All data is now organized by lab cycles with a consistent structure:"
+echo -e "data/lab_cycles/cycle_id/
+  ├── audio/        (recordings for this cycle)
+  ├── transcripts/  (speech transcripts)
+  ├── lab_books/    (generated lab book documents)
+  ├── resources/    (images and other resources)
+  ├── knowledge_base/ (RAG knowledge base)
+  └── sessions/     (session metadata)"
+
+echo -e "\nTo start recording with the new structure:"
+echo -e "${GREEN}python main.py --record --cycle-id your_cycle_id${NC}"

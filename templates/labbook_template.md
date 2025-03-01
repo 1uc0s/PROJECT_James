@@ -4,37 +4,27 @@
 
 **Participants:** {participants}
 
-## Objectives
+## Aims
+{content_aims}
 
-{content_objectives}
+## Choices
+{content_choices}
 
-## Materials and Methods
+## Summary
+{content_summary}
 
-{content_materials_and_methods}
+## Questions
+{content_questions}
 
-## Procedure
+## External Analysis
+<span style="color:red">
+{content_external_analysis}
+</span>
 
-{content_procedure}
-
-## Observations
-
-{content_observations}
-
-## Results
-
-{content_results}
-
-## Analysis
-
-{content_analysis}
-
-## Conclusions
-
-{content_conclusions}
-
-## Next Steps
-
-{content_next_steps}
+## External Comments
+<span style="color:blue">
+{content_external_comments}
+</span>
 
 ---
 

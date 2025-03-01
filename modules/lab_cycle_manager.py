@@ -1,12 +1,10 @@
-# modules/lab_cycle_manager.py
+# modules/lab_cycle_manager.py - Updated for simplified folder structure
 import os
 import json
-import shutil
 import datetime
-from pathlib import Path
+import numpy as np
 
 # Vector database for RAG
-import numpy as np
 try:
     import faiss
     FAISS_AVAILABLE = True
@@ -24,13 +22,13 @@ except ImportError:
     print("Transformers not available - using basic TF-IDF for embeddings")
     from sklearn.feature_extraction.text import TfidfVectorizer
 
-from config import DATA_DIR
+from config import LAB_CYCLES_DIR, get_cycle_paths
 
 class LabCycleManager:
     def __init__(self):
         """Initialize the lab cycle manager for organizing lab sessions"""
-        self.base_dir = os.path.join(DATA_DIR, "lab_cycles")
-        os.makedirs(self.base_dir, exist_ok=True)
+        # Ensure lab cycles directory exists
+        os.makedirs(LAB_CYCLES_DIR, exist_ok=True)
         
         # Initialize embedding model
         self.embedding_model = None
@@ -54,15 +52,13 @@ class LabCycleManager:
     
     def create_lab_cycle(self, cycle_id, title, description=None):
         """Create a new lab cycle"""
-        cycle_dir = os.path.join(self.base_dir, cycle_id)
+        cycle_dir = os.path.join(LAB_CYCLES_DIR, cycle_id)
         
         if os.path.exists(cycle_dir):
             raise ValueError(f"Lab cycle '{cycle_id}' already exists")
         
-        # Create directories
-        os.makedirs(cycle_dir, exist_ok=True)
-        os.makedirs(os.path.join(cycle_dir, "sessions"), exist_ok=True)
-        os.makedirs(os.path.join(cycle_dir, "knowledge_base"), exist_ok=True)
+        # Create directories using the helper function
+        paths = get_cycle_paths(cycle_id)
         
         # Create metadata
         metadata = {
@@ -79,7 +75,7 @@ class LabCycleManager:
         }
         
         # Save metadata
-        with open(os.path.join(cycle_dir, "metadata.json"), 'w') as f:
+        with open(os.path.join(paths["root"], "metadata.json"), 'w') as f:
             json.dump(metadata, f, indent=2)
         
         print(f"Created lab cycle: {title} (ID: {cycle_id})")
@@ -89,8 +85,8 @@ class LabCycleManager:
         """List all available lab cycles"""
         cycles = []
         
-        for item in os.listdir(self.base_dir):
-            cycle_dir = os.path.join(self.base_dir, item)
+        for item in os.listdir(LAB_CYCLES_DIR):
+            cycle_dir = os.path.join(LAB_CYCLES_DIR, item)
             metadata_file = os.path.join(cycle_dir, "metadata.json")
             
             if os.path.isdir(cycle_dir) and os.path.exists(metadata_file):
@@ -105,7 +101,8 @@ class LabCycleManager:
     
     def get_lab_cycle(self, cycle_id):
         """Get a lab cycle by ID"""
-        metadata_file = os.path.join(self.base_dir, cycle_id, "metadata.json")
+        paths = get_cycle_paths(cycle_id)
+        metadata_file = os.path.join(paths["root"], "metadata.json")
         
         if not os.path.exists(metadata_file):
             raise ValueError(f"Lab cycle '{cycle_id}' not found")
@@ -117,8 +114,8 @@ class LabCycleManager:
     
     def add_session_to_cycle(self, cycle_id, session_id, session_info=None):
         """Add a session to a lab cycle"""
-        cycle_dir = os.path.join(self.base_dir, cycle_id)
-        metadata_file = os.path.join(cycle_dir, "metadata.json")
+        paths = get_cycle_paths(cycle_id)
+        metadata_file = os.path.join(paths["root"], "metadata.json")
         
         if not os.path.exists(metadata_file):
             raise ValueError(f"Lab cycle '{cycle_id}' not found")
@@ -150,10 +147,8 @@ class LabCycleManager:
     # RAG functionality
     def add_document_to_knowledge_base(self, cycle_id, document, title=None, document_id=None, metadata=None):
         """Add a document to the knowledge base of a lab cycle"""
-        kb_dir = os.path.join(self.base_dir, cycle_id, "knowledge_base")
-        
-        if not os.path.exists(kb_dir):
-            os.makedirs(kb_dir, exist_ok=True)
+        paths = get_cycle_paths(cycle_id)
+        kb_dir = paths["knowledge_base"]
         
         # Generate ID if not provided
         if not document_id:
@@ -176,7 +171,7 @@ class LabCycleManager:
             json.dump(doc_metadata, f, indent=2)
         
         # Update cycle metadata
-        cycle_metadata_file = os.path.join(self.base_dir, cycle_id, "metadata.json")
+        cycle_metadata_file = os.path.join(paths["root"], "metadata.json")
         
         if os.path.exists(cycle_metadata_file):
             with open(cycle_metadata_file, 'r') as f:
@@ -264,7 +259,8 @@ class LabCycleManager:
     
     def build_knowledge_base_index(self, cycle_id):
         """Build or update the vector index for the knowledge base"""
-        kb_dir = os.path.join(self.base_dir, cycle_id, "knowledge_base")
+        paths = get_cycle_paths(cycle_id)
+        kb_dir = paths["knowledge_base"]
         index_dir = os.path.join(kb_dir, "index")
         os.makedirs(index_dir, exist_ok=True)
         
@@ -343,7 +339,7 @@ class LabCycleManager:
             print(f"Saved embeddings as numpy array (FAISS not available)")
         
         # Update cycle metadata
-        cycle_metadata_file = os.path.join(self.base_dir, cycle_id, "metadata.json")
+        cycle_metadata_file = os.path.join(paths["root"], "metadata.json")
         with open(cycle_metadata_file, 'r') as f:
             cycle_metadata = json.load(f)
         
@@ -358,7 +354,8 @@ class LabCycleManager:
     
     def retrieve_relevant_context(self, cycle_id, query, max_results=5):
         """Retrieve relevant context from the knowledge base using vector similarity"""
-        kb_dir = os.path.join(self.base_dir, cycle_id, "knowledge_base")
+        paths = get_cycle_paths(cycle_id)
+        kb_dir = paths["knowledge_base"]
         index_dir = os.path.join(kb_dir, "index")
         
         # Check if index exists

@@ -8,7 +8,7 @@ from datetime import datetime
 import sounddevice as sd
 from scipy.io.wavfile import write as write_wav
 
-from config import AUDIO_DIR, CHANNELS, RATE, CHUNK
+from config import AUDIO_DIR, CHANNELS, RATE, CHUNK, format_timestamp
 
 class RobustAudioRecorder:
     """Robust audio recorder that uses sounddevice instead of PyAudio"""
@@ -35,7 +35,9 @@ class RobustAudioRecorder:
         self.recording = True
         self.paused = False
         self.start_time = datetime.now()
-        self.filename = os.path.join(AUDIO_DIR, f"lab_session_{self.start_time.strftime('%Y%m%d_%H%M%S')}.wav")
+        
+        # Use improved timestamp format (YYYY-MM-DD_HH-MM)
+        self.filename = os.path.join(AUDIO_DIR, f"lab_session_{format_timestamp()}.wav")
         self.frames = []
         
         self.thread = threading.Thread(target=self._record)
@@ -52,7 +54,7 @@ class RobustAudioRecorder:
         
         self.paused = True
         self.pause_time = datetime.now()
-        print(f"Recording paused at {self.pause_time.strftime('%H:%M:%S')}")
+        print(f"Recording paused at {self.pause_time.strftime('%H:%M')}")
     
     def resume_recording(self):
         """Resume a paused recording"""
@@ -97,8 +99,8 @@ class RobustAudioRecorder:
         # Make a copy of current frames
         current_frames = np.vstack(self.frames.copy()) if len(self.frames) > 0 else np.array([])
         
-        # Create a temporary file
-        temp_filename = os.path.join(AUDIO_DIR, f"temp_segment_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav")
+        # Create a temporary file with improved timestamp format
+        temp_filename = os.path.join(AUDIO_DIR, f"temp_segment_{format_timestamp()}.wav")
         
         # Save the current frames
         if len(current_frames) > 0:
