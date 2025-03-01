@@ -164,6 +164,8 @@ def record_with_terminal_controls(args):
     # Start controller
     controller.start()
 
+# Main fixes in main.py - Just the post-processing section
+
 def process_audio_file(audio_path, model_path=None, whisper_model='base', 
                        output_format='both', custom_prompt=None, cycle_id=None,
                        post_process=DEFAULT_POST_PROCESS, api_provider=DEFAULT_API_PROVIDER):
@@ -257,21 +259,25 @@ def process_audio_file(audio_path, model_path=None, whisper_model='base',
     # Step 6: Post-process with advanced LLM if requested
     if post_process:
         print("\nPost-processing lab book with advanced LLM...")
-        analysis = llm.post_process_with_external_api(
-            lab_book_content, 
-            api_provider=api_provider
-        )
-        
-        # Save analysis to file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        analysis_file = os.path.join(OUTPUT_DIR, f"analysis_{timestamp}.md")
-        
-        with open(analysis_file, 'w') as f:
-            f.write(f"# Analysis of Lab Book: {title}\n\n")
-            f.write(analysis)
-        
-        print(f"Analysis saved to: {analysis_file}")
-        output_files.append(analysis_file)
+        try:
+            analysis = llm.post_process_with_external_api(
+                lab_book_content, 
+                api_provider=api_provider
+            )
+            
+            # Save analysis to file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            analysis_file = os.path.join(OUTPUT_DIR, f"analysis_{timestamp}.md")
+            
+            with open(analysis_file, 'w') as f:
+                f.write(f"# Analysis of Lab Book: {title}\n\n")
+                f.write(analysis)
+            
+            print(f"Analysis saved to: {analysis_file}")
+            output_files.append(analysis_file)
+        except Exception as e:
+            print(f"Error during post-processing: {e}")
+            print("Continuing without post-processing analysis")
     
     # Step 7: If part of a lab cycle, add to knowledge base
     if cycle_id and output_format in ['markdown', 'both']:

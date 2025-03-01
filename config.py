@@ -61,9 +61,10 @@ EXTERNAL_API_KEYS = {
     }
 }
 
-# External API default settings
+
+# Change to False if no API keys are available
 DEFAULT_API_PROVIDER = "openai"  # "openai" or "anthropic"
-DEFAULT_POST_PROCESS = True  # Whether to post-process by default
+DEFAULT_POST_PROCESS = True if os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY") else False
 
 # Lab book structure template - Updated to match the template in templates/labbook_template.md
 LAB_BOOK_SECTIONS = [

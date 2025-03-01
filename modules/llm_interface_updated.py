@@ -269,16 +269,23 @@ class LLMInterface:
         # Use the configured post-processing prompt
         return POST_PROCESSING_PROMPT.format(lab_book=lab_book_content)
     
+# Focused fix for the LLM OpenAI interface in llm_interface_updated.py
+
     def _process_with_openai(self, prompt, api_keys, max_tokens):
         """Process content using OpenAI API"""
         try:
-            print(f"Making request to OpenAI API with API key: {api_keys.get('api_key')[:4]}...")
+            api_key = api_keys.get('api_key')
+            if not api_key:
+                print("Error: No OpenAI API key found")
+                return self._generate_demo_analysis(prompt)
+                
+            print(f"Making request to OpenAI API with API key: {api_key[:4]}...")
             
             # Use requests directly instead of the openai library for more explicit error handling
             import requests
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_keys.get('api_key')}"
+                "Authorization": f"Bearer {api_key}"
             }
             
             payload = {
@@ -310,7 +317,7 @@ class LLMInterface:
         except Exception as e:
             print(f"Error using OpenAI API: {e}")
             return self._generate_demo_analysis(prompt)
-        
+            
     def _process_with_anthropic(self, prompt, api_keys, max_tokens):
         """Process content using Anthropic API"""
         try:

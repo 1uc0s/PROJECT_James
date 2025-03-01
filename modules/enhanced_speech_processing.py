@@ -150,7 +150,6 @@ class EnhancedSpeechProcessor:
             print(f"Error setting up HuggingFace API: {e}")
             return None
     
-    # Rest of the code remains the same...
     def _load_speaker_profiles(self):
         """Load existing speaker profiles"""
         profiles = {}
