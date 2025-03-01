@@ -7,7 +7,7 @@ import argparse
 from datetime import datetime
 
 # Import simplified modules
-from modules.simple_audio import SimpleAudioRecorder
+from modules.Legacy.simple_audio import SimpleAudioRecorder
 from modules.speech_processing import SpeechProcessor
 from modules.llm_interface import LLMInterface
 from modules.document_generator import DocumentGenerator
@@ -104,7 +104,7 @@ def main():
     
     if args.debug:
         # Import and run debug script
-        from debug import main as debug_main
+        from debug.debug import main as debug_main
         debug_main()
         return
         

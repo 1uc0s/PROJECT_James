@@ -1,62 +1,146 @@
 #!/usr/bin/env python
-# main.py
+# terminal_main.py - Version without keyboard module
 import os
 import sys
 import time
+import threading
 import argparse
 from datetime import datetime
 
 # Import project modules
-from modules.audio_capture import AudioRecorder
+from modules.robust_audio import RobustAudioRecorder
 from modules.speech_processing import SpeechProcessor
 from modules.llm_interface import LLMInterface
 from modules.document_generator import DocumentGenerator
-from modules.image_processor import ImageProcessor
 from modules.session_manager import SessionManager
-from modules.keyboard_control import KeyboardController
-from utils.helpers import get_most_recent_file, extract_title_from_content
 
 # Import configuration
-from config import OUTPUT_DIR, AUDIO_DIR, IMAGE_DIR
+from config import OUTPUT_DIR, AUDIO_DIR
 
-def setup_argparse():
-    """Set up command line argument parsing"""
-    parser = argparse.ArgumentParser(description='Lab Book Generator')
+class RecordingController:
+    """Terminal-based recording controller using keyboard input in the main thread"""
+    def __init__(self, recorder, session_manager):
+        self.recorder = recorder
+        self.session_manager = session_manager
+        self.running = True
+        self.paused = False
+        self.current_segment = 1
+        
+    def start(self):
+        """Start the controller in a loop"""
+        self.recorder.start_recording()
+        self._show_instructions()
+        
+        try:
+            while self.running:
+                # Get keyboard input without using keyboard module
+                cmd = input("\nCommand (p/r/s/l/q): ").strip().lower()
+                
+                if cmd == 'p':  # Pause
+                    self._pause()
+                elif cmd == 'r':  # Resume
+                    self._resume()
+                elif cmd == 's':  # New Segment
+                    self._new_segment()
+                elif cmd == 'l':  # Generate lab book
+                    self._generate_labbook()
+                elif cmd == 'q':  # Quit
+                    self._end_session()
+                else:
+                    print("Unknown command. Try again.")
+        
+        except KeyboardInterrupt:
+            print("\nReceived interrupt. Ending session...")
+            self._end_session()
+            
+        except Exception as e:
+            print(f"\nError: {e}")
+            self._end_session()
     
-    # Main operation modes
-    mode_group = parser.add_mutually_exclusive_group(required=True)
-    mode_group.add_argument('--record', action='store_true', help='Start audio recording')
-    mode_group.add_argument('--process', type=str, help='Process an existing audio file')
-    mode_group.add_argument('--add-image', type=str, help='Add an image to the latest lab book')
-    mode_group.add_argument('--list', action='store_true', help='List available recordings and lab books')
-    mode_group.add_argument('--sessions', action='store_true', help='List all recorded sessions')
-    mode_group.add_argument('--process-session', type=str, help='Process an existing session')
+    def _pause(self):
+        """Pause recording"""
+        if not self.paused:
+            self.recorder.pause_recording()
+            self.paused = True
+            print("\n⏸️  Recording paused.")
+        else:
+            print("\nAlready paused.")
     
-    # Optional arguments
-    parser.add_argument('--output-format', type=str, choices=['markdown', 'docx', 'both'], 
-                        default='both', help='Output format for the lab book')
-    parser.add_argument('--model', type=str, help='Path to custom LLM model')
-    parser.add_argument('--whisper-model', type=str, default='base', 
-                        choices=['tiny', 'base', 'small', 'medium', 'large'],
-                        help='Whisper model size for speech recognition')
-    parser.add_argument('--max-duration', type=int, default=0, 
-                        help='Maximum recording duration in seconds (0 = unlimited)')
-    parser.add_argument('--prompt', type=str, help='Custom prompt template file for the LLM')
-    parser.add_argument('--session-id', type=str, help='Specify a session ID')
-    parser.add_argument('--noise-filter', action='store_true', help='Enable noise filtering')
-    parser.add_argument('--voice-detection', action='store_true', help='Enable voice activity detection')
-    parser.add_argument('--context-size', type=int, default=8192, 
-                        help='Context size for the LLM (for large transcripts)')
+    def _resume(self):
+        """Resume recording"""
+        if self.paused:
+            self.recorder.resume_recording()
+            self.paused = False
+            print("\n▶️  Recording resumed.")
+        else:
+            print("\nAlready recording.")
     
-    return parser.parse_args()
+    def _new_segment(self):
+        """Start a new recording segment"""
+        self.recorder.stop_recording()
+        audio_file = self.recorder.get_last_recording()
+        if audio_file:
+            self.session_manager.add_recording(audio_file)
+            print(f"\n📁 Saved segment {self.current_segment} to session")
+            self.current_segment += 1
+        
+        # Start a new recording segment
+        time.sleep(0.5)  # Brief pause between recordings
+        self.recorder.start_recording()
+        print(f"\n🎤 Started new recording segment {self.current_segment}")
+    
+    def _generate_labbook(self):
+        """Generate interim lab book"""
+        # Pause recording temporarily
+        was_paused = self.paused
+        if not was_paused:
+            self.recorder.pause_recording()
+            self.paused = True
+        
+        print("\n📔 Generating interim lab book...")
+        
+        # Save current recording segment
+        temp_file = self.recorder.save_current_segment()
+        if temp_file:
+            self.session_manager.add_recording(temp_file)
+        
+        # Generate lab book
+        self.session_manager.generate_labbook()
+        
+        # Resume if it wasn't paused before
+        if not was_paused:
+            self.recorder.resume_recording()
+            self.paused = False
+            
+        print("\n✅ Interim lab book generated. Recording continues.")
+    
+    def _end_session(self):
+        """End recording session"""
+        print("\n🛑 Ending session and generating lab book...")
+        self.recorder.stop_recording()
+        audio_file = self.recorder.get_last_recording()
+        if audio_file:
+            self.session_manager.add_recording(audio_file)
+            
+        self.session_manager.end_session(generate_labbook=True)
+        self.running = False
+        print("\n✅ Session ended and lab book generated.")
+    
+    def _show_instructions(self):
+        """Display instructions"""
+        print("\n🎤 Recording controls:")
+        print("  p - Pause recording")
+        print("  r - Resume recording")
+        print("  s - Save current segment and start a new one")
+        print("  l - Generate lab book without ending session")
+        print("  q - End session and generate final lab book")
+        print("  (You can also press Ctrl+C to end the session)")
+        print("\n🎤 Recording active - Speak clearly for best results")
 
-def record_lab_session(args):
-    """Record a new lab session with keyboard controls"""
-    # Initialize the recorder with noise filtering if requested
-    recorder = AudioRecorder(
-        noise_filtering=args.noise_filter,
-        voice_activity_detection=args.voice_detection
-    )
+def record_with_terminal_controls(args):
+    """Record using terminal-based controls"""
+    # Initialize recorder without noise filtering for stability
+    recorder = RobustAudioRecorder()
     
     # Initialize session manager
     session_manager = SessionManager(
@@ -65,43 +149,14 @@ def record_lab_session(args):
         llm_model=args.model
     )
     
-    # Initialize keyboard controller
-    keyboard_controller = KeyboardController(recorder, session_manager)
+    # Initialize controller
+    controller = RecordingController(recorder, session_manager)
     
-    print("\n=== Lab Book Generator: Interactive Recording Mode ===\n")
-    print("Starting new recording session. Use keyboard shortcuts to control recording.")
+    print("\n=== Lab Book Generator: Terminal Controls ===\n")
+    print("Starting new recording session...")
     
-    try:
-        # Start recording
-        recorder.start_recording()
-        
-        # Start keyboard listener
-        keyboard_controller.start_listening()
-        
-        # Wait until keyboard controller signals to exit
-        while keyboard_controller.running:
-            time.sleep(0.5)
-            
-    except KeyboardInterrupt:
-        print("\nReceived interrupt, stopping recording...")
-    finally:
-        # Stop recording if still active
-        if recorder.recording:
-            audio_file = recorder.stop_recording()
-            if audio_file:
-                session_manager.add_recording(audio_file)
-        
-        # Stop keyboard listener
-        keyboard_controller.stop_listening()
-        
-        # End session and generate lab book
-        output_files = session_manager.end_session(generate_labbook=True)
-        
-        if output_files:
-            print("\nSession completed successfully!")
-            print(f"Lab book generated: {', '.join(output_files)}")
-        else:
-            print("\nSession ended, but no lab book was generated.")
+    # Start controller
+    controller.start()
 
 def process_audio_file(audio_path, model_path=None, whisper_model='base', output_format='both', custom_prompt=None):
     """Process an audio file to generate a lab book"""
@@ -158,74 +213,6 @@ def process_audio_file(audio_path, model_path=None, whisper_model='base', output
     
     return output_files
 
-def process_session(session_id, model_path=None, whisper_model='base', output_format='both', custom_prompt=None):
-    """Process an existing session to generate a lab book"""
-    try:
-        # Load the session
-        session = SessionManager.load_session(
-            session_id=session_id,
-            whisper_model=whisper_model,
-            llm_model=model_path
-        )
-        
-        # Generate lab book
-        output_files = session.generate_labbook(
-            output_format=output_format,
-            custom_prompt=custom_prompt
-        )
-        
-        if output_files:
-            print("\nLab book generated successfully!")
-            print(f"Output files: {', '.join(output_files)}")
-        else:
-            print("\nFailed to generate lab book for this session.")
-        
-        return output_files
-        
-    except Exception as e:
-        print(f"Error processing session: {e}")
-        return None
-
-def add_image_to_lab_book(image_path, model_path=None):
-    """Add an image to the most recent lab book"""
-    if not os.path.exists(image_path):
-        print(f"Error: Image file not found at {image_path}")
-        return False
-    
-    # Find the most recent lab book file
-    md_file = get_most_recent_file(OUTPUT_DIR, ".md")
-    docx_file = get_most_recent_file(OUTPUT_DIR, ".docx")
-    
-    if not md_file and not docx_file:
-        print("Error: No lab book found to add image to")
-        return False
-    
-    # Prefer markdown file if both exist
-    lab_book_path = md_file if md_file else docx_file
-    
-    # Import and process the image
-    image_processor = ImageProcessor()
-    imported_image = image_processor.import_image(image_path)
-    
-    # Check if the image is a graph
-    is_graph = image_processor.is_graph(imported_image)
-    
-    # Get a description for the image
-    llm = LLMInterface(model_path)
-    if is_graph:
-        image_caption = llm.analyze_image(imported_image)
-    else:
-        image_caption = f"Image: {os.path.basename(image_path)}"
-    
-    # Add the image to the document
-    doc_generator = DocumentGenerator()
-    success = doc_generator.add_image_to_document(lab_book_path, imported_image, image_caption)
-    
-    if success:
-        print(f"Image added to lab book {lab_book_path}")
-    
-    return success
-
 def list_files():
     """List available recordings and lab books"""
     print("\nAvailable Audio Recordings:")
@@ -255,20 +242,6 @@ def list_files():
             print("  No lab books found")
     else:
         print("  Output directory not found")
-    
-    print("\nAvailable Images:")
-    if os.path.exists(IMAGE_DIR):
-        images = [f for f in os.listdir(IMAGE_DIR) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
-        images.sort(key=lambda f: os.path.getctime(os.path.join(IMAGE_DIR, f)), reverse=True)
-        
-        if images:
-            for f in images:
-                creation_time = datetime.fromtimestamp(os.path.getctime(os.path.join(IMAGE_DIR, f))).strftime('%Y-%m-%d %H:%M:%S')
-                print(f"  {f} - Created: {creation_time}")
-        else:
-            print("  No images found")
-    else:
-        print("  Image directory not found")
 
 def list_sessions():
     """List all available sessions"""
@@ -296,9 +269,61 @@ def list_sessions():
     else:
         print("  No sessions found")
 
+def process_session(session_id, model_path=None, whisper_model='base', output_format='both', custom_prompt=None):
+    """Process an existing session to generate a lab book"""
+    try:
+        # Load the session
+        session = SessionManager.load_session(
+            session_id=session_id,
+            whisper_model=whisper_model,
+            llm_model=model_path
+        )
+        
+        # Generate lab book
+        output_files = session.generate_labbook(
+            output_format=output_format,
+            custom_prompt=custom_prompt
+        )
+        
+        if output_files:
+            print("\nLab book generated successfully!")
+            print(f"Output files: {', '.join(output_files)}")
+        else:
+            print("\nFailed to generate lab book for this session.")
+        
+        return output_files
+        
+    except Exception as e:
+        print(f"Error processing session: {e}")
+        return None
+
 def main():
     """Main application entry point"""
-    args = setup_argparse()
+    parser = argparse.ArgumentParser(description='Lab Book Generator (Terminal Controls)')
+    
+    # Main operation modes
+    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group.add_argument('--record', action='store_true', help='Start audio recording')
+    mode_group.add_argument('--process', type=str, help='Process an existing audio file')
+    mode_group.add_argument('--list', action='store_true', help='List available recordings and lab books')
+    mode_group.add_argument('--sessions', action='store_true', help='List all recorded sessions')
+    mode_group.add_argument('--process-session', type=str, help='Process an existing session')
+    
+    # Optional arguments
+    parser.add_argument('--output-format', type=str, choices=['markdown', 'docx', 'both'], 
+                        default='both', help='Output format for the lab book')
+    parser.add_argument('--model', type=str, help='Path to custom LLM model')
+    parser.add_argument('--whisper-model', type=str, default='base', 
+                        choices=['tiny', 'base', 'small', 'medium', 'large'],
+                        help='Whisper model size for speech recognition')
+    parser.add_argument('--max-duration', type=int, default=0, 
+                        help='Maximum recording duration in seconds (0 = unlimited)')
+    parser.add_argument('--prompt', type=str, help='Custom prompt template file for the LLM')
+    parser.add_argument('--session-id', type=str, help='Specify a session ID')
+    parser.add_argument('--context-size', type=int, default=8192, 
+                        help='Context size for the LLM (for large transcripts)')
+    
+    args = parser.parse_args()
     
     # Update config if context size is specified
     if args.context_size:
@@ -306,8 +331,8 @@ def main():
         LLM_CONTEXT_SIZE = args.context_size
     
     if args.record:
-        # Record a new lab session with interactive controls
-        record_lab_session(args)
+        # Record with terminal-based controls
+        record_with_terminal_controls(args)
     
     elif args.process:
         # Process an existing audio file
@@ -331,11 +356,6 @@ def main():
             custom_prompt=args.prompt
         )
     
-    elif args.add_image:
-        # Add an image to the most recent lab book
-        print("\n=== Lab Book Generator: Add Image Mode ===\n")
-        add_image_to_lab_book(args.add_image, args.model)
-    
     elif args.list:
         # List available files
         print("\n=== Lab Book Generator: File Listing ===")
@@ -345,11 +365,6 @@ def main():
         # List available sessions
         print("\n=== Lab Book Generator: Session Listing ===")
         list_sessions()
-    
-    else:
-        # This shouldn't happen due to the mutually_exclusive_group being required
-        print("No action specified. Use --record, --process, or --add-image")
-        print("Run with --help for more information")
 
 if __name__ == "__main__":
     main()
