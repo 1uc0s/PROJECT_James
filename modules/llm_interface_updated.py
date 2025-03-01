@@ -14,13 +14,16 @@ from config import (
 class LLMInterface:
     def __init__(self, model_path=None):
         """Initialize the LLM interface with support for Ollama and external APIs"""
+        # Get model path from parameter or config
         self.model_path = model_path or LLM_MODEL_PATH
         self.use_ollama = False
         self.ollama_model = None
         self.llm = None  # Initialize to None for all cases
         
+        print(f"Initializing LLM interface with model path: {self.model_path}")
+        
         # Check if we're using Ollama
-        if self.model_path and "ollama:" in self.model_path:
+        if self.model_path and isinstance(self.model_path, str) and "ollama:" in self.model_path:
             self.ollama_model = self.model_path.split("ollama:")[1]
             self.use_ollama = True
             print(f"Using Ollama with model: {self.ollama_model}")
@@ -43,7 +46,7 @@ class LLMInterface:
                             self.ollama_model = name  # Use the full name including tag
                             print(f"Ollama model '{name}' is available")
                             return
-                        
+                    
                     print(f"Warning: Model '{self.ollama_model}' not found in Ollama")
                     print(f"Available models: {', '.join(available_models)}")
                     print("Continuing in demo mode")
@@ -63,8 +66,28 @@ class LLMInterface:
             return
             
         # Check if model file exists for local GGUF models
-        if not os.path.exists(self.model_path):
-            print(f"Warning: LLM model not found at {self.model_path}")
+        try:
+            if not os.path.exists(self.model_path):
+                # Try absolute path
+                abs_path = os.path.abspath(self.model_path)
+                if os.path.exists(abs_path):
+                    self.model_path = abs_path
+                    print(f"Found model at absolute path: {abs_path}")
+                else:
+                    # Try relative to the current file
+                    rel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", self.model_path)
+                    if os.path.exists(rel_path):
+                        self.model_path = rel_path
+                        print(f"Found model at relative path: {rel_path}")
+                    else:
+                        print(f"Warning: LLM model not found at any of these locations:")
+                        print(f"  - Original path: {self.model_path}")
+                        print(f"  - Absolute path: {abs_path}")
+                        print(f"  - Relative path: {rel_path}")
+                        print("Running in demo mode - responses will be placeholders")
+                        return
+        except Exception as e:
+            print(f"Error checking model path: {e}")
             print("Running in demo mode - responses will be placeholders")
             return
         
@@ -80,6 +103,7 @@ class LLMInterface:
             print("LLM model loaded successfully")
         except Exception as e:
             print(f"Error loading LLM model: {e}")
+            print(f"Details: {str(e)}")
             print("Running in demo mode - responses will be placeholders")
     
     def generate_lab_book(self, transcript, custom_template=None, rag_context=None, 
@@ -186,7 +210,7 @@ class LLMInterface:
     
     def post_process_with_external_api(self, lab_book_content, api_provider="openai", max_tokens=1000):
         """Send the lab book to an external API for analysis and suggestions"""
-        print(f"Sending lab book to external API ({api_provider}) for post-processing...")
+        print(f"Sending lab book to external API ({api_provider}) for Smart Analysis...")
         
         api_keys = EXTERNAL_API_KEYS.get(api_provider, {})
         if not api_keys or not api_keys.get("api_key"):
@@ -209,8 +233,6 @@ class LLMInterface:
         # Use the configured post-processing prompt
         return POST_PROCESSING_PROMPT.format(lab_book=lab_book_content)
     
-    # Partial fix for modules/llm_interface_updated.py
-
     def _process_with_openai(self, prompt, api_keys, max_tokens):
         """Process content using OpenAI API"""
         try:

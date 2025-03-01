@@ -42,7 +42,17 @@ class EnhancedSpeechProcessor:
         # Store configurations
         self.primary_speaker = primary_speaker or "user"
         self.use_hf_api = use_hf_api
+        
+        # Initialize HF token with explicit priority:
+        # 1. Parameter passed to constructor
+        # 2. Environment variable
         self.hf_token = hf_token or os.environ.get("HF_TOKEN")
+        
+        if not self.hf_token:
+            print("WARNING: No HuggingFace token found. Speaker diarization requires a HF_TOKEN.")
+            print("Set with: export HF_TOKEN=your_token_here or pass directly to the constructor.")
+        else:
+            print("HuggingFace token found. Will attempt to use for diarization.")
         
         # Check for required token when using HF API
         if self.use_hf_api and not self.hf_token:
@@ -51,7 +61,6 @@ class EnhancedSpeechProcessor:
             self.use_hf_api = False
         
         # Initialize speaker diarization based on configuration
-        # FIX: Properly initialize device as torch.device object
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
         elif torch.backends.mps.is_available():
@@ -66,14 +75,16 @@ class EnhancedSpeechProcessor:
                 # Use API-based diarization
                 self.diarization = self._setup_hf_api_diarization()
             else:
-                # Use local diarization
+                # Use local diarization - print token length for debugging
+                token_status = "NO TOKEN" if not self.hf_token else f"Token available (length: {len(self.hf_token)})"
+                print(f"HF Token status: {token_status}")
+                
                 self.diarization = Pipeline.from_pretrained(
                     diarization_model, 
                     use_auth_token=self.hf_token
                 )
                 
                 # Move to appropriate device
-                # FIX: Use str(self.device) for comparison to handle torch.device object
                 if str(self.device) == "mps":
                     # PyAnnote might not support MPS directly
                     self.diarization = self.diarization.to("cpu")

@@ -32,7 +32,7 @@ class DocumentGenerator:
             section_key = section.lower().replace(' ', '_')
             template += f"## {section}\n\n"
             
-            if section == "External Analysis":
+            if section == "Smart Analysis":
                 template += "<span style=\"color:red\">\n{content_" + section_key + "}\n</span>\n\n"
             elif section == "External Comments":
                 template += "<span style=\"color:blue\">\n{content_" + section_key + "}\n</span>\n\n"
@@ -100,7 +100,7 @@ class DocumentGenerator:
             doc.add_heading(section_title, 1)
             
             # Check for colored text sections
-            is_red_section = "External Analysis" in section_title
+            is_red_section = "Smart Analysis" in section_title
             is_blue_section = "External Comments" in section_title
             
             # Remove HTML color span tags if present
@@ -178,7 +178,7 @@ Rate constant was determined to be 0.045 min^-1.
 - Would a different solvent change the kinetics?
 - What is the mechanism for this reaction?
 
-## External Analysis
+## Smart Analysis
 <span style="color:red">
 This experiment effectively established baseline kinetics for the X+Y reaction system.
 The choice of catalyst was appropriate, though testing multiple catalysts would provide valuable comparative data.

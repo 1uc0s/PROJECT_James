@@ -16,9 +16,9 @@
 ## Questions
 {content_questions}
 
-## External Analysis
+## Smart Analysis
 <span style="color:red">
-{content_external_analysis}
+{content_smart_analysis}
 </span>
 
 ## External Comments

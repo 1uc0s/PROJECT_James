@@ -65,19 +65,16 @@ EXTERNAL_API_KEYS = {
 DEFAULT_API_PROVIDER = "openai"  # "openai" or "anthropic"
 DEFAULT_POST_PROCESS = True  # Whether to post-process by default
 
-# Lab book structure template
+# Lab book structure template - Updated to match the template in templates/labbook_template.md
 LAB_BOOK_SECTIONS = [
     "Title",
     "Date",
     "Participants",
-    "Objectives",
-    "Materials and Methods",
-    "Procedure",
-    "Observations",
-    "Results",
-    "Analysis",
-    "Conclusions", 
-    "Next Steps",
+    "Aims",
+    "Choices",
+    "Summary",
+    "Questions",
+    "Smart Analysis",
     "External Comments"
 ]
 
@@ -110,21 +107,17 @@ def format_timestamp(include_seconds=False):
     else:
         return datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-# Default prompt template
+# Default prompt template - Updated to match the new sections
 LAB_BOOK_PROMPT = """
 Create a detailed lab book entry based on the following transcript.
 Structure the lab book with these sections:
 - Title: Derive a concise title from the experiment discussion
 - Date: {date}
 - Participants: List all participants mentioned in the transcript
-- Objectives: Clearly state the goals of the experiment
-- Materials and Methods: List all equipment, reagents and methods mentioned
-- Procedure: Describe the step-by-step process followed
-- Observations: Note all observations mentioned
-- Results: Summarize the outcomes and findings
-- Analysis: Provide analysis of the results
-- Conclusions: Summarize the key conclusions
-- Next Steps: Suggest follow-up experiments or actions
+- Aims: Clearly state the goals of the experiment
+- Choices: List key decisions and materials chosen
+- Summary: Summarize the outcomes and findings
+- Questions: List areas for further investigation or open questions
 
 Use a formal, scientific tone and organize information logically. 
 If certain sections lack information, note this but don't invent details.
@@ -147,7 +140,7 @@ Analyze the following graph/image and provide a detailed description:
 Be specific and technical in your description.
 """
 
-# Post-processing prompts
+# Post-processing prompts - Renamed to Smart Analysis
 POST_PROCESSING_PROMPT = """
 You are a scientific advisor helping to improve this lab book and suggest next steps.
 Please analyze the lab book below and provide the following:
