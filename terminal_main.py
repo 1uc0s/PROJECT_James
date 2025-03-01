@@ -8,7 +8,7 @@ import argparse
 from datetime import datetime
 
 # Import project modules
-from modules.simple_audio import SimpleAudioRecorder
+from modules.robust_audio import RobustAudioRecorder
 from modules.speech_processing import SpeechProcessor
 from modules.llm_interface import LLMInterface
 from modules.document_generator import DocumentGenerator
@@ -140,7 +140,7 @@ class RecordingController:
 def record_with_terminal_controls(args):
     """Record using terminal-based controls"""
     # Initialize recorder without noise filtering for stability
-    recorder = SimpleAudioRecorder()
+    recorder = RobustAudioRecorder()
     
     # Initialize session manager
     session_manager = SessionManager(

@@ -1,0 +1,16 @@
+{
+  "audio_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_112640/audio/segment_003.wav",
+  "date": "2025-03-01",
+  "language": "en",
+  "duration": 20.0,
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 20.0,
+      "text": "Okay, so now I'm speaking and then I want to make a new lab.",
+      "speaker": "unknown"
+    }
+  ],
+  "full_text": "Okay, so now I'm speaking and then I want to make a new lab."
+}

@@ -1,0 +1,16 @@
+{
+  "audio_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_112640/audio/segment_002.wav",
+  "date": "2025-03-01",
+  "language": "en",
+  "duration": 7.0,
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 7.0,
+      "text": "And then I guess I want to save another one now.",
+      "speaker": "unknown"
+    }
+  ],
+  "full_text": "And then I guess I want to save another one now."
+}

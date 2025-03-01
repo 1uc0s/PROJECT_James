@@ -14,9 +14,11 @@ env/
 ENV/
 
 # Data directories (uncomment if you want to exclude data)
-# data/raw/
-# data/processed/
-# data/output/
+data/raw/
+data/processed/
+data/output/
+data/audio/
+data/sessions
 
 # IDE specific files
 .idea/

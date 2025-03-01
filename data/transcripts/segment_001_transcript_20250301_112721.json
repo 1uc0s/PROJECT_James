@@ -1,0 +1,30 @@
+{
+  "audio_file": "/Users/lucasertugrul/Documents/Github/PROJECT_James/data/sessions/session_20250301_112640/audio/segment_001.wav",
+  "date": "2025-03-01",
+  "language": "en",
+  "duration": 18.96,
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 9.92,
+      "text": "Hello, I'm doing this again now. I don't know whether this is going to work. I think it seems to",
+      "speaker": "unknown"
+    },
+    {
+      "id": 1,
+      "start": 9.92,
+      "end": 15.280000000000001,
+      "text": "save all to the same audio place and then when I sort of pull it out and I resume it, now I've",
+      "speaker": "unknown"
+    },
+    {
+      "id": 2,
+      "start": 15.28,
+      "end": 18.96,
+      "text": "got a second bit and I want to save once.",
+      "speaker": "unknown"
+    }
+  ],
+  "full_text": "Hello, I'm doing this again now. I don't know whether this is going to work. I think it seems to\nsave all to the same audio place and then when I sort of pull it out and I resume it, now I've\ngot a second bit and I want to save once."
+}
