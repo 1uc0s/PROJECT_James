@@ -18,7 +18,8 @@ from modules.lab_cycle_manager import LabCycleManager
 # Import configuration
 from config import (
     OUTPUT_DIR, AUDIO_DIR, DEFAULT_LAB_CYCLE, 
-    DEFAULT_API_PROVIDER, DEFAULT_POST_PROCESS
+    DEFAULT_API_PROVIDER, DEFAULT_POST_PROCESS,
+    USE_OPENAI, OPENAI_DEFAULT_MODEL, OPENAI_MODELS
 )
 
 class RecordingController:
@@ -152,7 +153,9 @@ def record_with_terminal_controls(args):
         session_id=args.session_id,
         cycle_id=args.cycle_id or DEFAULT_LAB_CYCLE,
         whisper_model=args.whisper_model,
-        llm_model=args.model
+        llm_model=args.model,
+        use_openai=args.use_openai,
+        openai_model=args.openai_model
     )
     
     # Initialize controller
@@ -164,11 +167,10 @@ def record_with_terminal_controls(args):
     # Start controller
     controller.start()
 
-# Main fixes in main.py - Just the post-processing section
-
 def process_audio_file(audio_path, model_path=None, whisper_model='base', 
                        output_format='both', custom_prompt=None, cycle_id=None,
-                       post_process=DEFAULT_POST_PROCESS, api_provider=DEFAULT_API_PROVIDER):
+                       post_process=DEFAULT_POST_PROCESS, api_provider=DEFAULT_API_PROVIDER,
+                       use_openai=None, openai_model=None):
     """Process an audio file to generate a lab book"""
     if not os.path.exists(audio_path):
         print(f"Error: Audio file not found at {audio_path}")
@@ -224,7 +226,12 @@ def process_audio_file(audio_path, model_path=None, whisper_model='base',
         prompt_template = None
     
     # Step 4: Generate lab book using LLM
-    llm = LLMInterface(model_path)
+    llm = LLMInterface(
+        model_path=model_path,
+        use_openai=use_openai,
+        openai_model=openai_model
+    )
+    
     lab_book_content = llm.generate_lab_book(
         transcript_text, 
         prompt_template, 
@@ -385,7 +392,8 @@ def list_lab_cycles():
 
 def process_session(session_id, model_path=None, whisper_model='base', 
                    output_format='both', custom_prompt=None, cycle_id=None,
-                   post_process=DEFAULT_POST_PROCESS, api_provider=DEFAULT_API_PROVIDER):
+                   post_process=DEFAULT_POST_PROCESS, api_provider=DEFAULT_API_PROVIDER,
+                   use_openai=None, openai_model=None):
     """Process an existing session to generate a lab book"""
     try:
         # Load the session
@@ -393,13 +401,17 @@ def process_session(session_id, model_path=None, whisper_model='base',
             session_id=session_id,
             cycle_id=cycle_id,  # Will auto-detect if not provided
             whisper_model=whisper_model,
-            llm_model=model_path
+            llm_model=model_path,
+            use_openai=use_openai,
+            openai_model=openai_model
         )
         
         # Generate lab book
         output_files = session.generate_labbook(
             output_format=output_format,
-            custom_prompt=custom_prompt
+            custom_prompt=custom_prompt,
+            post_process=post_process,
+            api_provider=api_provider
         )
         
         if not output_files:
@@ -408,32 +420,6 @@ def process_session(session_id, model_path=None, whisper_model='base',
         
         print("\nLab book generated successfully!")
         print(f"Output files: {', '.join(output_files)}")
-        
-        # Post-process with advanced LLM if requested
-        if post_process:
-            # Get the markdown file or first file
-            lab_book_file = next((f for f in output_files if f.endswith('.md')), output_files[0])
-            
-            with open(lab_book_file, 'r') as f:
-                lab_book_content = f.read()
-            
-            print("\nPost-processing lab book with advanced LLM...")
-            llm = LLMInterface(model_path)
-            analysis = llm.post_process_with_external_api(
-                lab_book_content, 
-                api_provider=api_provider
-            )
-            
-            # Save analysis to file
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            analysis_file = os.path.join(OUTPUT_DIR, f"analysis_{timestamp}.md")
-            
-            with open(analysis_file, 'w') as f:
-                f.write(f"# Analysis of Lab Book: {session_id}\n\n")
-                f.write(analysis)
-            
-            print(f"Analysis saved to: {analysis_file}")
-            output_files.append(analysis_file)
         
         return output_files
         
@@ -494,12 +480,25 @@ def main():
     parser.add_argument('--api', type=str, choices=['openai', 'anthropic'], 
                         default=DEFAULT_API_PROVIDER, help='API provider for post-processing')
     
+    # New arguments for OpenAI integration
+    parser.add_argument('--use-openai', action='store_true', default=USE_OPENAI,
+                        help='Use OpenAI API instead of local LLM')
+    parser.add_argument('--use-local', action='store_true',
+                        help='Use local LLM (Ollama) instead of OpenAI API')
+    parser.add_argument('--openai-model', type=str, choices=OPENAI_MODELS,
+                        default=OPENAI_DEFAULT_MODEL, help='Specify the OpenAI model to use')
+    
     args = parser.parse_args()
     
     # Update config if context size is specified
     if args.context_size:
         from config import LLM_CONTEXT_SIZE
         LLM_CONTEXT_SIZE = args.context_size
+    
+    # Determine use_openai flag (--use-local overrides --use-openai)
+    use_openai = args.use_openai
+    if args.use_local:
+        use_openai = False
     
     # Determine post-processing flag (--no-post-process overrides --post-process)
     post_process = args.post_process
@@ -521,7 +520,9 @@ def main():
             custom_prompt=args.prompt,
             cycle_id=args.cycle_id,
             post_process=post_process,
-            api_provider=args.api
+            api_provider=args.api,
+            use_openai=use_openai,
+            openai_model=args.openai_model
         )
     
     elif args.process_session:
@@ -535,7 +536,9 @@ def main():
             custom_prompt=args.prompt,
             cycle_id=args.cycle_id,
             post_process=post_process,
-            api_provider=args.api
+            api_provider=args.api,
+            use_openai=use_openai,
+            openai_model=args.openai_model
         )
     
     elif args.list:

@@ -8,12 +8,28 @@ import re
 from config import (
     LLM_MODEL_PATH, LLM_CONTEXT_SIZE, LLM_TEMPERATURE, LLM_MAX_TOKENS, 
     LAB_BOOK_PROMPT, IMAGE_ANALYSIS_PROMPT, EXTERNAL_API_KEYS,
-    POST_PROCESSING_PROMPT
+    POST_PROCESSING_PROMPT, USE_OPENAI, OPENAI_DEFAULT_MODEL
 )
 
 class LLMInterface:
-    def __init__(self, model_path=None):
-        """Initialize the LLM interface with support for Ollama and external APIs"""
+    def __init__(self, model_path=None, use_openai=None, openai_model=None):
+        """Initialize the LLM interface with support for Ollama, OpenAI and external APIs"""
+        # Store OpenAI settings
+        self.use_openai = use_openai if use_openai is not None else USE_OPENAI
+        self.openai_model = openai_model or OPENAI_DEFAULT_MODEL
+        
+        # Check for OpenAI API key if using OpenAI
+        if self.use_openai:
+            self.openai_api_key = EXTERNAL_API_KEYS.get("openai", {}).get("api_key")
+            if not self.openai_api_key:
+                print("Warning: OpenAI API key not found but USE_OPENAI is True.")
+                print("Using Ollama as fallback. Please set OPENAI_API_KEY environment variable.")
+                self.use_openai = False
+            else:
+                print(f"Using OpenAI API with model: {self.openai_model}")
+                return
+
+        # If not using OpenAI, proceed with local model setup
         # Get model path from parameter or config
         self.model_path = model_path or LLM_MODEL_PATH
         self.use_ollama = False
@@ -171,6 +187,10 @@ class LLMInterface:
             context=context if context else "[No additional context available]"
         )
         
+        # Use OpenAI if configured
+        if self.use_openai:
+            return self._generate_with_openai(prompt)
+        
         # Use Ollama if configured
         if self.use_ollama and self.ollama_model:
             try:
@@ -226,6 +246,46 @@ class LLMInterface:
         print("Using demo mode for lab book generation")
         return self._generate_demo_lab_book(transcript)
     
+    def _generate_with_openai(self, prompt):
+        """Generate text using OpenAI API"""
+        try:
+            print(f"Generating lab book content with OpenAI ({self.openai_model})...")
+            import requests
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.openai_api_key}"
+            }
+            
+            payload = {
+                "model": self.openai_model,
+                "messages": [
+                    {"role": "system", "content": "You are a scientific lab book assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": LLM_MAX_TOKENS,
+                "temperature": LLM_TEMPERATURE
+            }
+            
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                content = result["choices"][0]["message"]["content"]
+                print("OpenAI API request successful")
+                return content
+            else:
+                print(f"OpenAI API Error: Status code {response.status_code}")
+                print(f"Response: {response.text}")
+                return self._generate_demo_lab_book(prompt.split("Transcript:")[-1])
+                
+        except Exception as e:
+            print(f"Error using OpenAI API: {e}")
+            return self._generate_demo_lab_book(prompt.split("Transcript:")[-1])
+    
     def analyze_image(self, image_path, transcript_context=None):
         """Analyze an image (graph, plot, etc.) and generate a description"""
         # Check if image exists
@@ -234,6 +294,9 @@ class LLMInterface:
             
         # This would normally use a multimodal LLM
         # For now, we'll just return a placeholder response
+        if self.use_openai:
+            return f"[Analysis of {os.path.basename(image_path)} - multimodal analysis would be generated with OpenAI]"
+        
         if self.use_ollama:
             # Ollama doesn't support multimodal yet in this interface
             return f"[Analysis of {os.path.basename(image_path)} - multimodal analysis would be generated here]"
@@ -269,8 +332,6 @@ class LLMInterface:
         # Use the configured post-processing prompt
         return POST_PROCESSING_PROMPT.format(lab_book=lab_book_content)
     
-# Focused fix for the LLM OpenAI interface in llm_interface_updated.py
-
     def _process_with_openai(self, prompt, api_keys, max_tokens):
         """Process content using OpenAI API"""
         try:

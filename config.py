@@ -42,6 +42,16 @@ LLM_CONTEXT_SIZE = 4096
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 2048
 
+# OpenAI API settings
+USE_OPENAI = False  # Set to True to use OpenAI instead of local LLM
+OPENAI_DEFAULT_MODEL = "gpt-4"  # Default model to use with OpenAI
+OPENAI_MODELS = [
+    "gpt-4",
+    "gpt-4-turbo",
+    "gpt-4o",
+    "gpt-3.5-turbo",
+]
+
 # Speaker diarization settings
 USE_HF_API = True  # Whether to use HuggingFace API for diarization
 PRIMARY_SPEAKER = "Me"  # Label for the primary speaker
