@@ -44,7 +44,7 @@ LLM_MAX_TOKENS = 2048
 
 # Speaker diarization settings
 USE_HF_API = True  # Whether to use HuggingFace API for diarization
-PRIMARY_SPEAKER = "You"  # Label for the primary speaker
+PRIMARY_SPEAKER = "Me"  # Label for the primary speaker
 
 # Lab cycle settings
 DEFAULT_LAB_CYCLE = None  # Set this to a cycle ID to make it the default
