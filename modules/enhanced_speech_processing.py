@@ -52,7 +52,7 @@ class EnhancedSpeechProcessor:
             print("WARNING: No HuggingFace token found. Speaker diarization requires a HF_TOKEN.")
             print("Set with: export HF_TOKEN=your_token_here or pass directly to the constructor.")
         else:
-            print("HuggingFace token found. Will attempt to use for diarization.")
+            print(f"HuggingFace token found. Token length: {len(self.hf_token)}")
         
         # Check for required token when using HF API
         if self.use_hf_api and not self.hf_token:
@@ -61,39 +61,62 @@ class EnhancedSpeechProcessor:
             self.use_hf_api = False
         
         # Initialize speaker diarization based on configuration
+        print("Setting up device for speech processing...")
         if torch.cuda.is_available():
+            print("CUDA device available - using GPU acceleration")
             self.device = torch.device("cuda")
         elif torch.backends.mps.is_available():
             print("Using Apple Metal (MPS) for acceleration")
             self.device = torch.device("mps")
         else:
+            print("No GPU acceleration available - using CPU")
             self.device = torch.device("cpu")
+            
+        print(f"Device type: {type(self.device)}, Device: {self.device}")
             
         try:
             print(f"Loading diarization model on {self.device}...")
+            
             if self.use_hf_api:
                 # Use API-based diarization
                 self.diarization = self._setup_hf_api_diarization()
             else:
-                # Use local diarization - print token length for debugging
+                # Use local diarization
                 token_status = "NO TOKEN" if not self.hf_token else f"Token available (length: {len(self.hf_token)})"
                 print(f"HF Token status: {token_status}")
                 
-                self.diarization = Pipeline.from_pretrained(
-                    diarization_model, 
-                    use_auth_token=self.hf_token
-                )
+                print("About to call Pipeline.from_pretrained...")
+                try:
+                    self.diarization = Pipeline.from_pretrained(
+                        diarization_model, 
+                        use_auth_token=self.hf_token
+                    )
+                    print("Pipeline.from_pretrained successful")
+                except Exception as e:
+                    print(f"Error in Pipeline.from_pretrained: {e}")
+                    print(f"Error type: {type(e)}")
+                    raise
                 
                 # Move to appropriate device
-                if self.device == torch.device("mps"):
-                    # PyAnnote might not support MPS directly
-                    self.diarization = self.diarization.to(torch.device("cpu"))
-                else:
-                    self.diarization = self.diarization.to(self.device)
+                print(f"Moving diarization model to device. Current device: {self.device}, Type: {type(self.device)}")
+                try:
+                    # PyAnnote doesn't support MPS directly, use CPU for Apple Silicon
+                    if torch.backends.mps.is_available():
+                        print("MPS device detected - moving to CPU instead")
+                        self.diarization = self.diarization.to(torch.device("cpu"))
+                    else:
+                        print(f"Moving to device: {self.device}")
+                        self.diarization = self.diarization.to(self.device)
+                    print("Device migration completed")
+                except Exception as e:
+                    print(f"Error moving model to device: {e}")
+                    print(f"Error type: {type(e)}")
+                    raise
                     
             print("Diarization model loaded successfully")
         except Exception as e:
             print(f"Warning: Could not load diarization model: {e}")
+            print(f"Detailed error type: {type(e)}")
             print("Continuing without speaker identification...")
             self.diarization = None
         
@@ -111,6 +134,7 @@ class EnhancedSpeechProcessor:
         try:
             import requests
             # Test connection to HF API
+            print(f"Testing connection to HuggingFace API with token: {self.hf_token[:4]}...")
             response = requests.get(
                 "https://huggingface.co/api/models", 
                 headers={"Authorization": f"Bearer {self.hf_token}"}
@@ -120,11 +144,13 @@ class EnhancedSpeechProcessor:
                 return "hf_api"  # Just a marker that we're using the API
             else:
                 print(f"Error connecting to HuggingFace API: {response.status_code}")
+                print(f"Response: {response.text}")
                 return None
         except Exception as e:
             print(f"Error setting up HuggingFace API: {e}")
             return None
     
+    # Rest of the code remains the same...
     def _load_speaker_profiles(self):
         """Load existing speaker profiles"""
         profiles = {}

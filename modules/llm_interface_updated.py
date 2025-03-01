@@ -22,53 +22,78 @@ class LLMInterface:
         
         print(f"Initializing LLM interface with model path: {self.model_path}")
         
-        # Check if we're using Ollama
-        if self.model_path and isinstance(self.model_path, str) and (
-            "ollama:" in self.model_path or 
-            # Add condition to recognize direct model names
-            (not os.path.exists(self.model_path) and ":" in self.model_path)
-        ):
-            # If it includes ollama: prefix, extract model name
+        # Check if we're using Ollama - enhanced detection logic
+        if self.model_path and isinstance(self.model_path, str):
+            # Check for Ollama prefix
             if "ollama:" in self.model_path:
                 self.ollama_model = self.model_path.split("ollama:")[1]
-            else:
-                # Otherwise use the whole string as model name
+                self.use_ollama = True
+            # Also check for model name with colon (typical of Ollama models like llama3.2:latest)
+            elif ":" in self.model_path and not os.path.exists(self.model_path):
                 self.ollama_model = self.model_path
+                self.use_ollama = True
             
-            self.use_ollama = True
-            print(f"Using Ollama with model: {self.ollama_model}")
-            
-            # Test Ollama availability
-            try:
-                response = requests.get("http://localhost:11434/api/tags")
-                if response.status_code == 200:
-                    models = response.json().get("models", [])
-                    available_models = []
-                    for model in models:
-                        name = model["name"]
-                        # Remove tags like ":latest" for comparison
-                        base_name = name.split(":")[0] if ":" in name else name
-                        available_models.append(name)
+            if self.use_ollama:
+                print(f"Using Ollama with model: {self.ollama_model}")
+                
+                # Test Ollama availability
+                try:
+                    response = requests.get("http://localhost:11434/api/tags")
+                    if response.status_code == 200:
+                        models = response.json().get("models", [])
+                        available_models = []
+                        model_found = False
                         
-                        # Check if our requested model matches (ignoring tags)
-                        if (self.ollama_model == name or 
-                            self.ollama_model == base_name):
-                            self.ollama_model = name  # Use the full name including tag
-                            print(f"Ollama model '{name}' is available")
-                            return
-                    
-                    print(f"Warning: Model '{self.ollama_model}' not found in Ollama")
-                    print(f"Available models: {', '.join(available_models)}")
+                        for model in models:
+                            name = model["name"]
+                            available_models.append(name)
+                            
+                            # Check if our requested model matches any available model
+                            if self.ollama_model == name:
+                                # Exact match
+                                print(f"Ollama model '{name}' found (exact match)")
+                                model_found = True
+                                break
+                            
+                            # Check base model without tags
+                            base_name = name.split(":")[0] if ":" in name else name
+                            if self.ollama_model == base_name:
+                                # Base name match, use the full name from Ollama
+                                print(f"Ollama model base '{base_name}' found, using '{name}'")
+                                self.ollama_model = name
+                                model_found = True
+                                break
+                            
+                            # Check if we specified a base model and this is a variant
+                            req_base = self.ollama_model.split(":")[0] if ":" in self.ollama_model else self.ollama_model
+                            if req_base == base_name:
+                                # Base model found, use our specified version
+                                print(f"Ollama base model '{req_base}' found")
+                                model_found = True
+                                # Keep using the model name we requested
+                                break
+                        
+                        if not model_found:
+                            print(f"Warning: Model '{self.ollama_model}' not found in Ollama")
+                            print(f"Available models: {', '.join(available_models)}")
+                            print("Continuing in demo mode")
+                            self.use_ollama = False
+                    else:
+                        print(f"Error connecting to Ollama API: {response.status_code}")
+                        print(f"Response: {response.text}")
+                        print("Make sure Ollama is running (run 'ollama serve' in another terminal)")
+                        print("Continuing in demo mode")
+                        self.use_ollama = False
+                except Exception as e:
+                    print(f"Error connecting to Ollama: {e}")
+                    print("Make sure Ollama is running (run 'ollama serve' in another terminal)")
                     print("Continuing in demo mode")
                     self.use_ollama = False
-            except Exception as e:
-                print(f"Error connecting to Ollama: {e}")
-                print("Make sure Ollama is running (run 'ollama serve' in another terminal)")
-                print("Continuing in demo mode")
-                self.use_ollama = False
-            
-            return
-            
+                
+                # If Ollama is being used, we can return early since we don't need to load a local model
+                if self.use_ollama:
+                    return
+        
         # Traditional llama-cpp-python approach as fallback
         if not self.model_path:
             print("Warning: No LLM model path specified. Please set LLM_MODEL_PATH in config.py")
@@ -167,7 +192,8 @@ class LLMInterface:
                     generated_text = response.json().get("response", "")
                     return generated_text.strip()
                 else:
-                    print(f"Error from Ollama API: {response.text}")
+                    print(f"Error from Ollama API: {response.status_code}")
+                    print(f"Response: {response.text}")
                     print("Falling back to demo mode")
                     return self._generate_demo_lab_book(transcript)
                     
@@ -349,6 +375,16 @@ class LLMInterface:
 
 ## Questions
 [This section would list areas needing further investigation]
+
+## Smart Analysis
+<span style="color:red">
+This is a placeholder for Smart Analysis that would be generated by an advanced AI.
+</span>
+
+## External Comments
+<span style="color:blue">
+This is a placeholder for External Comments from lab partners and instructors.
+</span>
 
 ---
 Note: This is a demo lab book. For full functionality, please ensure Ollama is running with your preferred model.
