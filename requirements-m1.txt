@@ -26,3 +26,4 @@ fpdf
 # Utilities
 numpy
 tqdm
+faiss-cpu

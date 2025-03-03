@@ -40,16 +40,19 @@ SILENCE_DURATION = 3  # seconds
 LLM_MODEL_PATH = "llama3.2:latest"  # Using Ollama with llama3.2
 LLM_CONTEXT_SIZE = 4096
 LLM_TEMPERATURE = 0.7
-LLM_MAX_TOKENS = 2048
+LLM_MAX_TOKENS = 16384
 
 # OpenAI API settings
-USE_OPENAI = False  # Set to True to use OpenAI instead of local LLM
-OPENAI_DEFAULT_MODEL = "gpt-4"  # Default model to use with OpenAI
+USE_OPENAI = True  # Set to True to use OpenAI instead of local LLM
+OPENAI_DEFAULT_MODEL = "o1"  # Default model to use with OpenAI
 OPENAI_MODELS = [
     "gpt-4",
     "gpt-4-turbo",
     "gpt-4o",
     "gpt-3.5-turbo",
+    "o1-mini",
+    "o3-mini",
+    "o1"
 ]
 
 # Speaker diarization settings
@@ -57,7 +60,7 @@ USE_HF_API = True  # Whether to use HuggingFace API for diarization
 PRIMARY_SPEAKER = "Me"  # Label for the primary speaker
 
 # Lab cycle settings
-DEFAULT_LAB_CYCLE = None  # Set this to a cycle ID to make it the default
+DEFAULT_LAB_CYCLE = 'waves'  # Set this to a cycle ID to make it the default
 RAG_MAX_RESULTS = 3  # Number of contexts to retrieve for RAG
 VECTOR_DB_TYPE = "faiss"  # "faiss" or "simple" for vector similarity
 

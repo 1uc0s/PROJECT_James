@@ -12,6 +12,7 @@ build/
 venv/
 env/
 ENV/
+fresh_venv/
 
 # Data directories (uncomment if you want to exclude data)
 data/

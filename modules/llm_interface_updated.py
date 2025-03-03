@@ -262,8 +262,9 @@ class LLMInterface:
                     {"role": "system", "content": "You are a scientific lab book assistant."},
                     {"role": "user", "content": prompt}
                 ],
-                "max_tokens": LLM_MAX_TOKENS,
-                "temperature": LLM_TEMPERATURE
+                # "max_tokens": LLM_MAX_TOKENS, #CHANGE THIS ALSO BACK WHEN USING LEGACY MODELS
+               "max_completion_tokens":LLM_MAX_TOKENS,
+                # "temperature": LLM_TEMPERATURE #COMMENT THIS WHEN USING o1 and LATER MODELS
             }
             
             response = requests.post(
